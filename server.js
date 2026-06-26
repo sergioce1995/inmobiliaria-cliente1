@@ -32,15 +32,23 @@ const SEED_UPLOADS = path.join(__dirname, 'seed', 'propiedades');
 
 function seedDataIfNeeded() {
   try {
+    // Crear directorio de BD si no existe (para Vercel)
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+
+    // Copiar seed si existe, si no el servidor creará una BD vacía
     if (!fs.existsSync(DB_PATH) && fs.existsSync(SEED_DB)) {
-      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
       fs.copyFileSync(SEED_DB, DB_PATH);
       console.log('🌱 Base de datos inicial copiada a', DB_PATH);
+    } else if (!fs.existsSync(DB_PATH)) {
+      console.log('📝 Nueva base de datos será creada en', DB_PATH);
     }
+
     if (fs.existsSync(SEED_UPLOADS) && (!fs.existsSync(UPLOADS_DIR) || fs.readdirSync(UPLOADS_DIR).length === 0)) {
       fs.mkdirSync(UPLOADS_DIR, { recursive: true });
       fs.cpSync(SEED_UPLOADS, UPLOADS_DIR, { recursive: true });
       console.log('🌱 Imágenes iniciales copiadas a', UPLOADS_DIR);
+    } else {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     }
   } catch (e) {
     console.warn('⚠️ Seed inicial:', e.message);
