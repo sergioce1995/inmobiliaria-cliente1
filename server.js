@@ -147,6 +147,7 @@ function initializeCRMTables() {
     db.run(`ALTER TABLE properties ADD COLUMN longitud REAL`, () => {});
     db.run(`ALTER TABLE properties ADD COLUMN unidad_superficie TEXT DEFAULT 'm²'`, () => {});
     db.run(`ALTER TABLE properties ADD COLUMN ciudad TEXT`, () => {});
+    db.run(`ALTER TABLE leads ADD COLUMN interes_propiedades TEXT`, () => {});
 
     console.log('✅ CRM tables and migrations initialized');
   } catch (err) {
