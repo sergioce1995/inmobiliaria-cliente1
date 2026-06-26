@@ -1,0 +1,27 @@
+# Dependencias (se reinstalan con npm install)
+node_modules/
+
+# Bases de datos — DATOS REALES, no subir a GitHub
+*.db
+
+# Secretos / credenciales — NUNCA subir
+google-credentials.json
+.env
+
+# Logs
+*.log
+
+# Configuración local del editor/agente
+.claude/
+
+# Imágenes subidas de propiedades (datos ligados a la BD)
+public/propiedades/
+
+# Sistema
+Thumbs.db
+.DS_Store
+
+# Datos iniciales para el PRIMER despliegue en Render (repo privado).
+# Se copian al disco persistente solo si está vacío; luego mandan los del disco.
+!seed/pg.db
+

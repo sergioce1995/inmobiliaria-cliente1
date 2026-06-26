@@ -1,0 +1,172 @@
+/* ============================================================
+   ZADI CRM — UI Kit component styles
+   ============================================================ */
+
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid transparent; border-radius: var(--r-md);
+  font-size: 14px; font-weight: 600; letter-spacing: -.01em;
+  padding: 0 16px; height: 40px; white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast),
+              border-color var(--t-fast), transform var(--t-fast);
+  user-select: none;
+}
+.btn:active { transform: translateY(1px) scale(.99); }
+.btn svg { flex: none; }
+.btn.sm { height: 33px; padding: 0 12px; font-size: 13px; border-radius: var(--r-sm); }
+.btn.lg { height: 46px; padding: 0 22px; font-size: 15px; }
+.btn.block { width: 100%; }
+
+.btn-primary { background: var(--blue); color: #fff; box-shadow: var(--sh-xs); }
+.btn-primary:hover { background: var(--blue-700); box-shadow: var(--sh-blue); }
+
+.btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: var(--sh-xs); }
+.btn-secondary:hover { border-color: #cfd6dd; background: var(--bg-2); }
+
+.btn-ghost { background: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: rgba(31,45,61,.05); color: var(--ink); }
+
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { background: #c8453d; box-shadow: 0 8px 24px rgba(229,84,75,.28); }
+
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover { background: var(--green-600); }
+
+.btn:disabled { opacity: .5; pointer-events: none; }
+
+/* ---------- Icon button ---------- */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: var(--r-md);
+  border: 1px solid transparent; background: transparent; color: var(--ink-2);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.icon-btn:hover { background: rgba(31,45,61,.06); color: var(--ink); }
+.icon-btn.bordered { border-color: var(--line); background: var(--surface); box-shadow: var(--sh-xs); }
+.icon-btn.bordered:hover { border-color: #cfd6dd; }
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 10px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 600; letter-spacing: -.01em;
+}
+.badge .bdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge-nuevo      { color: var(--blue);   background: var(--blue-50); }
+.badge-contactado { color: var(--orange-600); background: var(--orange-50); }
+.badge-visita     { color: var(--green-600);  background: var(--green-50); }
+.badge-negociacion { color: #a78bfa; background: #f3e8ff; }
+.badge-cerrado    { color: #5cb338; background: #eef7e8; }
+.badge-perdido    { color: #9ca3af; background: #f3f4f6; }
+/* Legacy compat */
+.badge-interesado { color: var(--green-600);  background: var(--green-50); }
+.badge.pulse .bdot { animation: pulseDot 1.8s infinite; }
+
+/* ---------- Card ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--sh-xs);
+}
+
+/* ---------- Input ---------- */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field > label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap > .ic-left { position: absolute; left: 13px; color: var(--ink-3); pointer-events: none; display: flex; }
+.input {
+  width: 100%; height: 42px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); font-size: 14px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+  outline: none;
+}
+.input::placeholder { color: var(--ink-4); }
+.input:hover { border-color: #cfd6dd; }
+.input:focus { border-color: var(--blue); box-shadow: 0 0 0 3.5px var(--blue-50); }
+.input.has-left { padding-left: 40px; }
+.input.error { border-color: var(--red); }
+.input.error:focus { box-shadow: 0 0 0 3.5px var(--red-50); }
+textarea.input { height: auto; padding: 11px 14px; resize: vertical; line-height: 1.5; }
+.field-error { font-size: 12px; color: var(--red); display: flex; align-items: center; gap: 5px; }
+
+/* Floating-label / underline variant (login) */
+.fl { position: relative; }
+.fl input {
+  width: 100%; border: none; border-bottom: 1.5px solid var(--line);
+  background: transparent; font-size: 15px; padding: 22px 2px 8px; color: var(--ink); outline: none;
+}
+.fl label {
+  position: absolute; left: 2px; top: 18px; color: var(--ink-3); font-size: 15px;
+  pointer-events: none; transition: all var(--t); transform-origin: left;
+}
+.fl input:focus ~ label, .fl input.filled ~ label { top: 0; font-size: 11.5px; font-weight: 600; color: var(--blue); letter-spacing: .02em; }
+.fl .underline { position: absolute; bottom: 0; left: 0; height: 1.5px; width: 100%; background: var(--blue); transform: scaleX(0); transform-origin: left; transition: transform var(--t); }
+.fl input:focus ~ .underline { transform: scaleX(1); }
+
+/* ---------- Select ---------- */
+.select-wrap { position: relative; display: inline-flex; }
+.select {
+  appearance: none; height: 42px; padding: 0 38px 0 14px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 500;
+  outline: none; cursor: pointer; transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.select:hover { border-color: #cfd6dd; }
+.select:focus { border-color: var(--blue); box-shadow: 0 0 0 3.5px var(--blue-50); }
+.select-wrap > svg { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+
+/* ---------- Toggle ---------- */
+.toggle { position: relative; width: 46px; height: 27px; border-radius: 999px; background: #d4dae0; border: none; padding: 0; transition: background var(--t); flex: none; }
+.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: var(--sh-sm); transition: transform var(--t); }
+.toggle.on { background: var(--green); }
+.toggle.on::after { transform: translateX(19px); }
+.toggle.on.blue { background: var(--blue); }
+
+/* ---------- Tabs ---------- */
+.tabs { display: inline-flex; gap: 2px; padding: 4px; background: #eceef1; border-radius: var(--r-md); }
+.tab { border: none; background: transparent; height: 32px; padding: 0 14px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; color: var(--ink-2); transition: all var(--t-fast); }
+.tab:hover { color: var(--ink); }
+.tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-xs); }
+
+/* ---------- Avatar ---------- */
+.avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 700; flex: none; letter-spacing: -.02em; }
+
+/* ---------- Tooltip ---------- */
+.tip { position: relative; display: inline-flex; }
+.tip > .tip-bubble {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px);
+  background: var(--ink); color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap;
+  padding: 6px 9px; border-radius: 7px; opacity: 0; pointer-events: none; transition: all var(--t-fast); z-index: 50;
+}
+.tip > .tip-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--ink); }
+.tip > .tip-bubble.wide { white-space: normal; width: 230px; text-align: left; line-height: 1.4; font-weight: 400; }
+.tip:hover > .tip-bubble { opacity: 1; transform: translateX(-50%) translateY(0); }
+.info-i { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--line); color: var(--ink-3); font-size: 10.5px; font-weight: 800; font-style: normal; cursor: help; transition: all var(--t-fast); }
+.info-i:hover { background: var(--blue); color: #fff; }
+
+/* ---------- Modal ---------- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(20,30,42,.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: fadeIn .22s var(--ease); padding: 24px; }
+.modal { background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--sh-lg); width: 100%; max-width: 520px; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; animation: scaleIn .26s var(--ease); }
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px 0; }
+.modal-body { padding: 18px 24px; overflow: auto; }
+.modal-foot { padding: 16px 24px 22px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--line-2); margin-top: 4px; }
+
+/* ---------- Toast ---------- */
+.toast-wrap { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.toast { display: flex; align-items: center; gap: 11px; background: var(--ink); color: #fff; padding: 12px 18px 12px 14px; border-radius: var(--r-md); box-shadow: var(--sh-lg); font-size: 14px; font-weight: 500; animation: fadeUp .3s var(--ease); }
+.toast .tcheck { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff; flex: none; }
+
+/* ---------- Spinner ---------- */
+.spinner { width: 18px; height: 18px; border: 2.2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+.spinner.dark { border-color: rgba(31,45,61,.18); border-top-color: var(--blue); }
+
+/* ---------- Skeleton ---------- */
+.skel { position: relative; overflow: hidden; background: #eceef1; border-radius: 8px; }
+.skel::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: shimmer 1.4s infinite; }
+
+/* ---------- Segmented ---------- */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+.seg button { border: none; background: transparent; height: 38px; width: 40px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3); transition: all var(--t-fast); }
+.seg button:hover { color: var(--ink); }
+.seg button.active { background: var(--blue-50); color: var(--blue); }
