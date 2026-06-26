@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "buildCommand": "npm install",
+  "env": {
+    "SESSION_SECRET": "@SESSION_SECRET",
+    "DATABASE_URL": "@DATABASE_URL"
+  },
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs20.x",
+      "memory": 512,
+      "maxDuration": 30
+    }
+  }
+}
