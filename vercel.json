@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "buildCommand": "npm install",
+  "env": {
+    "SESSION_SECRET": "@SESSION_SECRET",
+    "DATABASE_URL": "@DATABASE_URL",
+    "NODE_ENV": "production"
+  }
+}
