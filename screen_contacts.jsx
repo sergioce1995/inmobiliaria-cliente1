@@ -19,7 +19,7 @@
     return (
       <Modal open={open} onClose={onClose} width={520}>
         <div style={{ padding: '22px 24px' }}>
-          <h2 className="t-h2" style={{ margin: '0 0 4px' }}>Nuevo lead</h2>
+          <h2 className="t-h2" style={{ margin: '0 0 4px' }}>Nuevo interesado</h2>
           <p style={{ color: 'var(--ink-3)', fontSize: 13.5, margin: '0 0 18px' }}>Añade un contacto manualmente a tu base de datos.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Input label="Nombre *" value={form.nombre} onChange={set('nombre')} placeholder="María" />
@@ -38,7 +38,7 @@
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
             <Button variant="primary" icon="check" onClick={submit} disabled={!form.nombre || !form.email || saving}>
-              {saving ? 'Guardando…' : 'Crear lead'}
+              {saving ? 'Guardando…' : 'Crear interesado'}
             </Button>
           </div>
         </div>
@@ -56,17 +56,21 @@
     return d.toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  // Punto de calidad/interés del lead (verde/amarillo/gris). Calculado, preparado para afinar.
-  function QualityDot({ lead, visits }) {
+  const QUALITY_STYLE = {
+    alto:  { label: 'Alto',  bg: '#eaf6e4', color: '#3a7d1f' },
+    medio: { label: 'Medio', bg: '#fff3e0', color: '#c77d00' },
+    bajo:  { label: 'Bajo',  bg: '#f3f4f6', color: '#9ca3af' },
+  };
+  function QualityLabel({ lead, visits }) {
     const level = (window.leadScore ? window.leadScore(lead, visits) : { level: 'bajo' }).level;
-    const info = (window.LEAD_QUALITY || {})[level] || { label: '' };
-    return <span className={`lead-q ${level}`} title={info.label} />;
+    const s = QUALITY_STYLE[level] || QUALITY_STYLE.bajo;
+    return <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: s.bg, color: s.color, whiteSpace: 'nowrap' }}>{s.label}</span>;
   }
 
   function ContactsScreen({ leads, setLeads, visits = [], properties = [], extFilter, clearExtFilter, onCreateLead, onUpdateLead, onDeleteLead, onSaveVisit, onDeleteVisit }) {
     const visitForLead = (id) => visits.find((v) => v.lead_id === id && v.status === 'programada');
     const [q, setQ] = useState('');
-    const [view, setView] = useState('table');
+    const [view, setView] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 860 ? 'grid' : 'table'));
     const [sort, setSort] = useState({ key: 'nombre', dir: 1 });
     const [maxBudget, setMaxBudget] = useState(2000000);
     const [showRange, setShowRange] = useState(false);
@@ -95,6 +99,7 @@
       return a;
     }, {});
 
+    const INTEREST_ORDER = { alto: 0, medio: 1, bajo: 2 };
     let rows = leads.filter((c) => {
       const hit = (c.nombre + c.email + c.ciudad).toLowerCase().includes(q.toLowerCase());
       const inBudget = c.presupuesto <= maxBudget;
@@ -108,6 +113,11 @@
       return hit && inBudget && inCity && inEstado && inOrigen && inTipo && inQuality && inProperty;
     });
     rows = [...rows].sort((a, b) => {
+      if (sort.key === 'interes') {
+        const aLevel = (window.leadScore ? window.leadScore(a, visits) : { level: 'bajo' }).level;
+        const bLevel = (window.leadScore ? window.leadScore(b, visits) : { level: 'bajo' }).level;
+        return (INTEREST_ORDER[aLevel] - INTEREST_ORDER[bLevel]) * sort.dir;
+      }
       let av = a[sort.key], bv = b[sort.key];
       if (sort.key === 'estado') return (STATUS_ORDER[av] - STATUS_ORDER[bv]) * sort.dir;
       if (typeof av === 'number') return (av - bv) * sort.dir;
@@ -205,14 +215,14 @@
               <button className={view === 'table' ? 'active' : ''} onClick={() => setView('table')}><Icon name="list" size={18} /></button>
               <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}><Icon name="grid" size={18} /></button>
             </div>
-            <Button variant="primary" icon="plus" onClick={() => setShowNew(true)}>Nuevo lead</Button>
+            <Button variant="primary" icon="plus" onClick={() => setShowNew(true)}>Nuevo interesado</Button>
           </div>
         </div>
 
         {/* Filtro por estado */}
         <div className="filter-row">
           {STATUS_FILTERS.map((f) => (
-            <button key={f} className={`fchip${estado === f ? ' active' : ''}`} onClick={() => setEstado(f)}>
+            <button key={f} className={`fchip fchip-${f}${estado === f ? ' active' : ''}`} onClick={() => setEstado(f)}>
               {SF_LABEL[f]} <span className="fc-count">{counts[f]}</span>
             </button>
           ))}
@@ -249,8 +259,8 @@
                   <SortHead k="email">Email</SortHead>
                   <th>Teléfono</th>
                   <SortHead k="ciudad">Ciudad</SortHead>
-                  <SortHead k="presupuesto" right>Presupuesto</SortHead>
                   <SortHead k="estado">Estado</SortHead>
+                  <SortHead k="interes">Interés</SortHead>
                   <th>Fecha de visita</th>
                 </tr>
               </thead>
@@ -260,12 +270,12 @@
                   return (
                   <tr key={c.id} style={{ background: selected.has(c.id) ? 'var(--blue-50)' : 'inherit' }}>
                     <td style={{ textAlign: 'center', width: 40 }} onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelected(c.id)} style={{ cursor: 'pointer' }} /></td>
-                    <td onClick={() => setOpenId(c.id)}><span className="cell-name"><Avatar name={c.nombre} color={c.avatar} size={32} /><QualityDot lead={c} visits={visits} />{c.nombre}</span></td>
+                    <td onClick={() => setOpenId(c.id)}><span className="cell-name"><Avatar name={c.nombre} color={c.avatar} size={32} />{c.nombre}</span></td>
                     <td className="cell-mut">{c.email}</td>
                     <td className="mono">{c.tel}</td>
                     <td>{c.ciudad}</td>
-                    <td className="cell-budget tnum" style={{ textAlign: 'right' }}>{fmtEur(c.presupuesto)}</td>
                     <td><StatusBadge status={c.estado} /></td>
+                    <td><QualityLabel lead={c} visits={visits} /></td>
                     <td className="cell-mut">
                       {v
                         ? <span className="badge" style={{ background: 'var(--blue-50)', color: 'var(--blue)' }}><Icon name="calendar" size={12} /> {fmtVisitShort(v.scheduled_for)}</span>
@@ -285,17 +295,17 @@
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                   <Avatar name={c.nombre} color={c.avatar} size={44} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 7 }}><QualityDot lead={c} visits={visits} />{c.nombre}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 7 }}>{c.nombre}</div>
                     <div style={{ fontSize: 12.5, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="phone" size={15} />{c.tel}</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="location" size={15} />{c.ciudad}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="euro" size={15} /><span className="tnum" style={{ fontWeight: 700 }}>{fmtEur(c.presupuesto)}</span></span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTop: '1px solid var(--line-2)' }}>
                   <StatusBadge status={c.estado} />
+                  <QualityLabel lead={c} visits={visits} />
                   <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.fecha}</span>
                 </div>
               </div>
@@ -323,7 +333,7 @@
             <div className="bab-actions">
               <button className="bab-btn" onClick={() => { const s = prompt('Nuevo estado:\nnuevo / contactado / visita / cerrado'); if (s) bulkAction('status', s); }}>Cambiar estado</button>
               <button className="bab-btn" onClick={() => bulkAction('archive')}>Archivar</button>
-              <button className="bab-btn danger" onClick={() => { if (confirm(`¿Eliminar ${selected.size} lead${selected.size > 1 ? 's' : ''}?`)) bulkAction('delete'); }}>Eliminar</button>
+              <button className="bab-btn danger" onClick={() => { if (confirm(`¿Eliminar ${selected.size} interesado${selected.size > 1 ? 's' : ''}?`)) bulkAction('delete'); }}>Eliminar</button>
               <button className="bab-btn" onClick={() => bulkAction('csv')}>Exportar CSV</button>
               <button className="bab-btn ghost" onClick={() => setSelected(new Set())}>Deseleccionar</button>
             </div>

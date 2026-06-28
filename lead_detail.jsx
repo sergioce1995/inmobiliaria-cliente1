@@ -4,7 +4,7 @@
   const { Avatar, StatusBadge, Button, Icon, Input } = window;
   const fmtEur = window.fmtEur;
   const STATUS_OPTS = ['nuevo', 'contactado', 'visita', 'negociacion', 'cerrado', 'perdido'];
-  const STATUS_COLOR = { nuevo: 'var(--blue)', contactado: 'var(--orange)', visita: 'var(--green)', negociacion: '#a78bfa', cerrado: 'var(--st-cerrado)', perdido: '#9ca3af' };
+  const STATUS_COLOR = { nuevo: 'var(--blue)', contactado: 'var(--orange)', visita: '#9333ea', negociacion: '#f59e0b', cerrado: '#10b981', perdido: '#9ca3af' };
 
   // ISO → valor para <input type="datetime-local"> en hora local
   const toLocalInput = (iso) => {
@@ -26,6 +26,12 @@
     const [editing, setEditing] = useState(false);
     const [confirmDel, setConfirmDel] = useState(false);
     const [edit, setEdit] = useState({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '' });
+    const [copied, setCopied] = useState(null);
+    const copyValue = (type, value) => {
+      if (navigator.clipboard) navigator.clipboard.writeText(value);
+      setCopied(type);
+      setTimeout(() => setCopied(null), 2000);
+    };
     React.useEffect(() => {
       setEdit({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '' });
       setEditing(false); setConfirmDel(false);
@@ -49,6 +55,7 @@
     const esPropietario = lead.origen === 'captacion';
     const origenLabel = ({ web_form: 'Web · interés en propiedad', captacion: 'Web · captación', manual: 'Alta manual', saved_search: 'Búsqueda guardada', agente_ia: 'Agente IA' })[lead.origen] || lead.origen || 'Web';
     const tipoLead = esPropietario ? 'Propietario · quiere vender / alquilar' : 'Interesado · busca propiedad';
+    const telLimpio = (lead.tel || '').replace(/[^\d+]/g, '');
     const send = () => { if (note.trim()) { onAddNote(lead.id, note.trim()); setNote(''); } };
     React.useEffect(() => { setVisitVal(toLocalInput(visit && visit.scheduled_for)); }, [visit && visit.id, visit && visit.scheduled_for]);
     const saveVisit = () => { if (visitVal && onSaveVisit) onSaveVisit(lead.id, new Date(visitVal).toISOString()); };
@@ -67,7 +74,7 @@
                 return <span className="lead-q-chip" title={q.label}><span className={`lead-q ${lvl}`} />{q.label}</span>;
               })()}
             </div>
-            <div style={{ color: 'var(--ink-3)', fontSize: 13.5, marginTop: 3 }}>Lead #{lead.id} · creado {lead.fecha}</div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 13.5, marginTop: 3 }}>Interesado desde {lead.fecha}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {onUpdateLead && !editing && <Button variant="secondary" size="sm" icon="edit" onClick={() => setEditing(true)}>Editar</Button>}
@@ -76,10 +83,19 @@
           </div>
         </div>
 
+        {/* Acciones rápidas — un click para contactar */}
+        {!editing && (telLimpio || lead.email) && (
+          <div className="ld-quick-actions">
+            {telLimpio && <button className={`ld-qa-btn ld-qa-call${copied === 'tel' ? ' ld-qa-copied' : ''}`} onClick={() => copyValue('tel', lead.tel || telLimpio)}><Icon name="phone" size={16} />{copied === 'tel' ? lead.tel : 'Llamar'}</button>}
+            {telLimpio && <a className="ld-qa-btn ld-qa-wa" href={`https://wa.me/${telLimpio.replace('+', '')}`} target="_blank" rel="noopener noreferrer"><Icon name="send" size={16} />WhatsApp</a>}
+            {lead.email && <button className={`ld-qa-btn ld-qa-mail${copied === 'email' ? ' ld-qa-copied' : ''}`} onClick={() => copyValue('email', lead.email)}><Icon name="mail" size={16} />{copied === 'email' ? lead.email : 'Email'}</button>}
+          </div>
+        )}
+
         {confirmDel && (
           <div style={{ margin: '0 0 16px', padding: '14px 16px', background: 'var(--surface-2, #fbeaea)', border: '1px solid var(--st-cerrado, #e5544b)', borderRadius: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>¿Eliminar este lead?</div>
-            <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 12px' }}>Se quitará de tu bandeja y base de datos junto con su visita programada. Esta acción no se puede deshacer.</p>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>¿Eliminar este interesado?</div>
+            <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 12px' }}>Se quitará de tu base de datos junto con su visita programada. Esta acción no se puede deshacer.</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <Button variant="secondary" size="sm" onClick={() => setConfirmDel(false)}>Cancelar</Button>
               <Button variant="danger" size="sm" icon="trash" onClick={doDelete}>Sí, eliminar</Button>
@@ -90,7 +106,7 @@
         <div className="detail-body">
           {editing ? (
             <div style={{ marginBottom: 22 }}>
-              <span className="t-eyebrow" style={{ display: 'block', marginBottom: 12 }}>Editar datos del lead</span>
+              <span className="t-eyebrow" style={{ display: 'block', marginBottom: 12 }}>Editar datos del interesado</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Input label="Nombre" value={edit.nombre} onChange={setE('nombre')} />
                 <Input label="Apellidos" value={edit.apellidos} onChange={setE('apellidos')} />
@@ -105,7 +121,7 @@
           ) : (
           <div className="detail-grid">
             <div className="dfield" style={{ gridColumn: '1 / -1' }}>
-              <span className="k">Tipo de lead</span>
+              <span className="k">Tipo de interesado</span>
               <span className="v">
                 <span className="badge" style={{ background: esPropietario ? '#fff3e0' : 'var(--blue-50)', color: esPropietario ? '#e89515' : 'var(--blue)' }}>
                   <Icon name={esPropietario ? 'tag' : 'properties'} size={13} /> {tipoLead}
@@ -115,7 +131,6 @@
             <div className="dfield"><span className="k">Email</span><span className="v"><Icon name="mail" size={15} />{lead.email}</span></div>
             <div className="dfield"><span className="k">Teléfono</span><span className="v"><Icon name="phone" size={15} />{lead.tel}</span></div>
             <div className="dfield"><span className="k">Origen</span><span className="v"><Icon name="share" size={15} />{origenLabel}</span></div>
-            <div className="dfield"><span className="k">Presupuesto</span><span className="v tnum">{fmtEur(lead.presupuesto)}</span></div>
             <div className="dfield" style={{ gridColumn: '1 / -1' }}>
               <span className="k">{esPropietario ? 'Quiere captar' : `Propiedades de interés${propNames.length > 1 ? ` (${propNames.length})` : ''}`}</span>
               {esPropietario ? (

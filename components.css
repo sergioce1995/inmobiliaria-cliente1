@@ -55,12 +55,12 @@
 .badge .bdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge-nuevo      { color: var(--blue);   background: var(--blue-50); }
 .badge-contactado { color: var(--orange-600); background: var(--orange-50); }
-.badge-visita     { color: var(--green-600);  background: var(--green-50); }
-.badge-negociacion { color: #a78bfa; background: #f3e8ff; }
-.badge-cerrado    { color: #5cb338; background: #eef7e8; }
+.badge-visita     { color: #9333ea; background: #faf5ff; }
+.badge-negociacion { color: #f59e0b; background: #fef3c7; }
+.badge-cerrado    { color: #10b981; background: #ecfdf5; }
 .badge-perdido    { color: #9ca3af; background: #f3f4f6; }
 /* Legacy compat */
-.badge-interesado { color: var(--green-600);  background: var(--green-50); }
+.badge-interesado { color: #9333ea; background: #faf5ff; }
 .badge.pulse .bdot { animation: pulseDot 1.8s infinite; }
 
 /* ---------- Card ---------- */

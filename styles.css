@@ -32,12 +32,12 @@
   /* ---- Status mapping ---- */
   --st-nuevo:        var(--blue);
   --st-contactado:   var(--orange);
-  --st-visita:       var(--green);
-  --st-negociacion:  #a78bfa;
-  --st-cerrado:      #5cb338;
+  --st-visita:       #9333ea;
+  --st-negociacion:  #f59e0b;
+  --st-cerrado:      #10b981;
   --st-perdido:      #9ca3af;
   /* Legacy compat */
-  --st-interesado:   var(--green);
+  --st-interesado:   #9333ea;
 
   /* ---- Typography ---- */
   --font-ui:   'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;

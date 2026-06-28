@@ -37,44 +37,47 @@
     cardElevation: true,
   }/*EDITMODE-END*/;
 
-  function Sidebar({ screen, setScreen, collapsed, setCollapsed, newCount, valPending, user = {} }) {
+  function Sidebar({ screen, setScreen, collapsed, setCollapsed, newCount, valPending, user = {}, mobileOpen, onCloseMobile }) {
     return (
-      <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
-        <div className="sb-brand">
-          <div className="sb-logo">Z</div>
-          {!collapsed && <span className="name">ZADI<span> ·</span></span>}
-        </div>
-        <button className="sb-collapse" onClick={() => setCollapsed((c) => !c)}>
-          <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={15} />
-        </button>
-        <nav className="sb-nav">
-          {NAV.map((n, i) => n.sec ? (
-            <div className="sb-section" key={i}>{n.sec}</div>
-          ) : (
-            <button key={n.id} className={`sb-item${screen === n.id ? ' active' : ''}`} onClick={() => setScreen(n.id)}
-              title={collapsed ? n.label : undefined}>
-              <Icon name={n.icon} size={20} />
-              <span className="lbl">{n.label}</span>
-              {n.id === 'contactos' && newCount > 0 && <span className="count">{newCount}</span>}
-              {n.id === 'valoraciones' && valPending > 0 && <span className="count">{valPending}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="sb-foot">
-          <div className="sb-user">
-            <Avatar name={user.nombre || 'Usuario'} color="#2E75B6" size={36} />
-            <div className="uinfo">
-              <div className="n">{user.nombre || 'Usuario'}</div>
-              <div className="r">{user.role === 'admin' ? 'Administrador' : 'Agente'}</div>
-            </div>
-            {!collapsed && <Icon name="chevronDown" size={16} style={{ marginLeft: 'auto', color: 'var(--ink-3)' }} />}
+      <>
+        <div className={`sidebar-backdrop${mobileOpen ? ' open' : ''}`} onClick={onCloseMobile} />
+        <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
+          <div className="sb-brand">
+            <div className="sb-logo">Z</div>
+            {!collapsed && <span className="name">ZADI<span> ·</span></span>}
           </div>
-        </div>
-      </aside>
+          <button className="sb-collapse" onClick={() => setCollapsed((c) => !c)}>
+            <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={15} />
+          </button>
+          <nav className="sb-nav">
+            {NAV.map((n, i) => n.sec ? (
+              <div className="sb-section" key={i}>{n.sec}</div>
+            ) : (
+              <button key={n.id} className={`sb-item${screen === n.id ? ' active' : ''}`} onClick={() => { setScreen(n.id); onCloseMobile && onCloseMobile(); }}
+                title={collapsed ? n.label : undefined}>
+                <Icon name={n.icon} size={20} />
+                <span className="lbl">{n.label}</span>
+                {n.id === 'contactos' && newCount > 0 && <span className="count">{newCount}</span>}
+                {n.id === 'valoraciones' && valPending > 0 && <span className="count">{valPending}</span>}
+              </button>
+            ))}
+          </nav>
+          <div className="sb-foot">
+            <div className="sb-user">
+              <Avatar name={user.nombre || 'Usuario'} color="#2E75B6" size={36} />
+              <div className="uinfo">
+                <div className="n">{user.nombre || 'Usuario'}</div>
+                <div className="r">{user.role === 'admin' ? 'Administrador' : 'Agente'}</div>
+              </div>
+              {!collapsed && <Icon name="chevronDown" size={16} style={{ marginLeft: 'auto', color: 'var(--ink-3)' }} />}
+            </div>
+          </div>
+        </aside>
+      </>
     );
   }
 
-  function Topbar({ title, onLogout, onGo, notifications = [], user = {} }) {
+  function Topbar({ title, onLogout, onGo, notifications = [], user = {}, onMenuClick }) {
     const [menu, setMenu] = useState(false);
     const [bell, setBell] = useState(false);
     const notifs = notifications;
@@ -85,6 +88,7 @@
     }, [menu, bell]);
     return (
       <header className="topbar">
+        <button className="mobile-menu-btn" onClick={onMenuClick}><Icon name="menu" size={20} /></button>
         <div className="crumbs">
           <span>ZADI</span><Icon name="chevronRight" size={14} /><span className="cur">{title}</span>
         </div>
@@ -142,6 +146,7 @@
     const [user, setUser] = useState({ nombre: '', email: '', role: '' });
     const [screen, setScreen] = useState('inicio');
     const [collapsed, setCollapsed] = useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
     // Asegurar que ZADI_DATA existe
     const zadiData = window.ZADI_DATA || { leads: [], valoraciones: [], properties: [], analytics: { kpis: [], funnel: [], sources: [], trend: [], insights: [] }, notifications: [] };
     const [leads, setLeads] = useState(zadiData.leads || []);
@@ -488,13 +493,13 @@
             notes: form.notes || '',
           }),
         });
-        if (!res.ok) throw new Error('No se pudo crear el lead');
+        if (!res.ok) throw new Error('No se pudo crear el interesado');
         await loadLeads();
-        pushToast('Lead creado');
+        pushToast('Interesado creado');
         return true;
       } catch (err) {
         console.error('Error creating lead:', err);
-        pushToast('Error al crear el lead');
+        pushToast('Error al crear el interesado');
         return false;
       }
     };
@@ -509,11 +514,11 @@
         });
         if (!res.ok) throw new Error('No se pudo actualizar');
         await loadLeads();
-        pushToast('Lead actualizado');
+        pushToast('Interesado actualizado');
         return true;
       } catch (err) {
         console.error('Error updating lead:', err);
-        pushToast('Error al actualizar el lead');
+        pushToast('Error al actualizar el interesado');
         return false;
       }
     };
@@ -527,11 +532,11 @@
         if (!res.ok) throw new Error('No se pudo eliminar');
         await loadLeads();
         await loadVisits();
-        pushToast('Lead eliminado');
+        pushToast('Interesado eliminado');
         return true;
       } catch (err) {
         console.error('Error deleting lead:', err);
-        pushToast('Error al eliminar el lead');
+        pushToast('Error al eliminar el interesado');
         return false;
       }
     };
@@ -608,8 +613,8 @@
         .reduce((s, p) => s + Math.round((p.precio || 0) * (p.comision || 3) / 100), 0);
 
       const kpis = [
-        { label: 'Nuevos sin contactar', value: nuevos, delta: 0, spark: [0, 0, 0, 0, 0, 0, nuevos], info: 'Leads nuevos que todavía no has contactado.' },
-        { label: 'Contactados', value: contactados, delta: 0, spark: [0, 0, 0, 0, 0, 0, contactados], info: 'Leads con los que ya has hablado al menos una vez.' },
+        { label: 'Nuevos sin contactar', value: nuevos, delta: 0, spark: [0, 0, 0, 0, 0, 0, nuevos], info: 'Interesados nuevos que todavía no has contactado.' },
+        { label: 'Contactados', value: contactados, delta: 0, spark: [0, 0, 0, 0, 0, 0, contactados], info: 'Interesados con los que ya has hablado al menos una vez.' },
         { label: 'Visitas esta semana', value: visitasSemana, delta: 0, spark: [0, 0, 0, 0, 0, 0, visitasSemana], info: 'Visitas programadas entre el lunes y el domingo de esta semana.' },
         { label: 'Comisión prevista', value: window.fmtEurShort(comisionPrevista), delta: 0, spark: [0, 0, 0, 0, 0, 0, 1], info: 'Comisión estimada por las propiedades disponibles.' },
       ];
@@ -696,7 +701,7 @@
       }).filter(Boolean).sort((a, b) => b.dias - a.dias);
 
       const summary = [
-        { label: 'Leads nuevos', value: nuevos.length, action: { screen: 'contactos', estado: 'nuevo' } },
+        { label: 'Interesados nuevos', value: nuevos.length, action: { screen: 'contactos', estado: 'nuevo' } },
         { label: 'Visitas hoy', value: visitasHoy.length, action: { screen: 'calendario' } },
         { label: 'Seguimientos', value: stale.length, action: { screen: 'contactos', estado: 'contactado' } },
         { label: 'Captaciones pendientes', value: captPend.length, action: { screen: 'valoraciones' } },
@@ -710,11 +715,10 @@
       // 🔴 Contactar interesados sin contactar (propiedad con más sin contactar)
       const topSin = propStats.filter((s) => s.sinContactar > 0).sort((a, b) => b.sinContactar - a.sinContactar)[0];
       if (topSin) recs.push({
-        priority: 'alta', icon: 'phone', w: 100,
+        tipo: 'urgente', icon: 'phone', w: 100,
         accion: `Contacta a ${topSin.sinContactar} interesado${plural(topSin.sinContactar)}`,
         motivo: `«${topSin.p.titulo}» tiene ${topSin.sinContactar} interesado${plural(topSin.sinContactar)} registrado${plural(topSin.sinContactar)} que todavía no has contactado.`,
         impacto: 'Alta probabilidad de convertir en visita. Acción de menos de 5 minutos.',
-        beneficio: 'Podrías convertir a alguno en visita.',
         cta: 'Contactar ahora', action: { screen: 'contactos', estado: 'nuevo', propertyId: topSin.p.id },
       });
 
@@ -722,44 +726,40 @@
       if (followUps.length) {
         const f = followUps[0];
         recs.push({
-          priority: 'seguimiento', icon: 'clock', w: 85,
+          tipo: 'seguimiento', icon: 'clock', w: 85,
           accion: `Llama a ${f.l.nombre}`,
           motivo: `${f.l.nombre} realizó una visita hace ${f.dias} día${plural(f.dias)} y todavía no hay seguimiento.`,
           impacto: `Lleva${f.dias > 1 ? 'n' : ''} esperando ${f.dias} días. Un seguimiento a tiempo evita perder la operación.`,
-          beneficio: 'Un seguimiento a tiempo evita perder la operación.',
-          cta: 'Abrir lead', action: { screen: 'contactos', leadId: f.l.id },
+          cta: 'Ver interesado', action: { screen: 'contactos', leadId: f.l.id },
         });
       }
 
       // 🟠 Programar visitas: propiedad con mucho interés y pocas visitas
       const topVisita = propStats.filter((s) => s.interesados >= 2 && s.vis <= 1 && s.interesados > s.vis).sort((a, b) => b.interesados - a.interesados)[0];
       if (topVisita) recs.push({
-        priority: 'media', icon: 'calendar', w: 75,
+        tipo: 'importante', icon: 'calendar', w: 75,
         accion: `Programa visitas de «${topVisita.p.titulo}»`,
         motivo: `Tiene ${topVisita.interesados} interesados y ${topVisita.vis === 0 ? 'ninguna visita' : 'solo 1 visita'} programada.`,
         impacto: 'Cada visita acerca la operación al cierre.',
-        beneficio: 'Reducirás el tiempo de venta.',
         cta: 'Abrir agenda', action: { screen: 'calendario', propertyId: topVisita.p.id },
       });
 
       // 🟢 Enviar propiedad a clientes compatibles (estimación)
       const topCompat = propStats.filter((s) => s.compat > 0).sort((a, b) => b.compat - a.compat)[0];
       if (topCompat) recs.push({
-        priority: 'oportunidad', icon: 'send', w: 60,
+        tipo: 'compatibles', icon: 'send', w: 60,
         accion: `Envía «${topCompat.p.titulo}» a ${topCompat.compat} cliente${plural(topCompat.compat)}`,
         motivo: `${topCompat.compat} cliente${plural(topCompat.compat)} de tu base de datos encaja${topCompat.compat === 1 ? '' : 'n'} con el perfil de esta vivienda y todavía no la conoce${topCompat.compat === 1 ? '' : 'n'} (estimado).`,
-        impacto: 'Puedes generar nuevas visitas sin captar nuevos leads.',
-        beneficio: 'Puedes generar nuevas visitas.',
+        impacto: 'Puedes generar nuevas visitas sin captar nuevos interesados.',
         cta: 'Ver compatibles', action: { screen: 'propiedades' },
       });
 
       // 🟠 Captaciones pendientes de valorar
       if (captPend.length) recs.push({
-        priority: 'media', icon: 'tag', w: 40,
+        tipo: 'importante', icon: 'tag', w: 40,
         accion: `Valora ${captPend.length} captación${captPend.length > 1 ? 'es' : ''}`,
         motivo: `Tienes ${captPend.length} captación${captPend.length > 1 ? 'es' : ''} pendiente${plural(captPend.length)} de valorar.`,
         impacto: 'Captar a tiempo te asegura nuevos inmuebles.',
-        beneficio: 'Captar a tiempo te asegura nuevos inmuebles.',
         cta: 'Ver captación', action: { screen: 'valoraciones' },
       });
 
@@ -784,7 +784,7 @@
     const notifications = (() => {
       const list = [];
       leads.filter((l) => l.estado === 'nuevo').slice(0, 6).forEach((l) => {
-        list.push({ icon: 'inbox', txt: `Nuevo lead: ${l.nombre}`, fecha: l.fecha || 'Reciente', screen: 'contactos' });
+        list.push({ icon: 'inbox', txt: `Nuevo interesado: ${l.nombre}`, fecha: l.fecha || 'Reciente', screen: 'contactos' });
       });
       valoraciones.filter((v) => v.estado === 'pendiente').slice(0, 4).forEach((v) => {
         list.push({ icon: 'tag', txt: `Captación pendiente: ${v.propietario}`, fecha: v.fecha || 'Reciente', screen: 'valoraciones' });
@@ -817,13 +817,13 @@
 
     return (
       <div className={`app${t.sidebarSolid ? ' nav-solid' : ''}${t.cardElevation ? '' : ' flat'}`}>
-        <Sidebar screen={screen} setScreen={goTo} collapsed={collapsed} setCollapsed={setCollapsed} newCount={newCount} valPending={valPending} user={user} />
+        <Sidebar screen={screen} setScreen={goTo} collapsed={collapsed} setCollapsed={setCollapsed} newCount={newCount} valPending={valPending} user={user} mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
         <div className="main">
-          <Topbar title={title} notifications={notifications} onLogout={logout} onGo={goTo} user={user} />
+          <Topbar title={title} notifications={notifications} onLogout={logout} onGo={goTo} user={user} onMenuClick={() => setMobileNavOpen((v) => !v)} />
           <div className="content">
             {screen === 'inicio' && <HomeScreen homeData={homeData} onGo={goTo} onAction={goWithFilter} user={user} />}
             {screen === 'contactos' && <ContactsScreen leads={leads} setLeads={setLeads} visits={visits} properties={properties} extFilter={extFilter} clearExtFilter={() => setExtFilter(null)} onCreateLead={createLead} onUpdateLead={updateLead} onDeleteLead={deleteLead} onSaveVisit={saveVisit} onDeleteVisit={deleteVisit} />}
-            {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goTo('contactos', leadId)} />}
+            {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goWithFilter({ screen: 'contactos', leadId })} />}
             {screen === 'calendario' && <CalendarScreen visits={visits} leads={leads} properties={properties} onCreateVisit={createVisit} onMoveVisit={moveVisit} onDeleteVisit={deleteVisit} onSaveVisit={saveVisit} toast={pushToast} />}
             {screen === 'valoraciones' && <ValoracionesScreen valoraciones={valoraciones} setValoraciones={setValoraciones} toast={pushToast} onCreate={createCaptacion} onUpdate={updateCaptacion} onDelete={deleteCaptacion} onConvert={convertCaptacion} />}
             {screen === 'dashboard' && <DashboardScreen analytics={dashboardAnalytics} properties={properties} onAction={goWithFilter} />}
