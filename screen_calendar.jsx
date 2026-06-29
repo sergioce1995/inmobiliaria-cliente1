@@ -50,7 +50,7 @@
         <div style={{ padding: '22px 24px' }}>
           <h2 className="t-h2" style={{ margin: '0 0 16px' }}>{isEdit ? 'Editar visita' : 'Nueva visita'}</h2>
           <div className="field">
-            <label>Lead</label>
+            <label>Interesado</label>
             <Select value={leadId} onChange={(e) => setLeadId(e.target.value)} disabled={isEdit}
               options={leads.map((l) => ({ value: l.id, label: l.nombre }))} />
           </div>
@@ -88,7 +88,7 @@
     const [modal, setModal] = useState(null); // { initial } | null
     const [dragId, setDragId] = useState(null);
 
-    const leadName = (id, visit) => { const l = leads.find((x) => x.id === id); if (l) return l.nombre; if (visit && visit.lead_name) return visit.lead_name.replace(/^Visita\s*[·\-]?\s*/i, ''); return 'Lead'; };
+    const leadName = (id, visit) => { const l = leads.find((x) => x.id === id); if (l) return l.nombre; if (visit && visit.lead_name) return visit.lead_name.replace(/^Visita\s*[·\-]?\s*/i, ''); return 'Interesado'; };
 
     const days = view === 'week'
       ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i))
@@ -179,7 +179,7 @@
         </div>
 
         {leads.length === 0 && (
-          <p style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 14 }}>Aún no tienes leads. Crea un lead en la Bandeja para poder programar visitas.</p>
+          <p style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 14 }}>Aún no tienes interesados. Crea uno en Base de datos para poder programar visitas.</p>
         )}
 
         {modal && (

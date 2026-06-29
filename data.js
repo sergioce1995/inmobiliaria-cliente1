@@ -8,10 +8,10 @@
   const properties = [];
   const valoraciones = [];
 
-  // Estados del lead — definición clara de cada etapa del embudo.
+  // Estados del interesado — definición clara de cada etapa del embudo.
   const statusInfo = {
-    nuevo:       { label: 'Nuevo',       desc: 'Lead recién llegado, todavía sin contactar.' },
-    contactado:  { label: 'Contactado',  desc: 'Ya has hablado con el lead al menos una vez.' },
+    nuevo:       { label: 'Nuevo',       desc: 'Interesado recién llegado, todavía sin contactar.' },
+    contactado:  { label: 'Contactado',  desc: 'Ya has hablado con el interesado al menos una vez.' },
     visita:      { label: 'Visita',      desc: 'Tiene una visita programada o ya realizada.' },
     negociacion: { label: 'Negociación', desc: 'Existe una oferta, reserva o conversaciones avanzadas.' },
     cerrado:     { label: 'Cerrado',     desc: 'Operación finalizada correctamente.' },
@@ -29,18 +29,18 @@
   const analytics = {
     kpis: [
       { label: 'Nuevos hoy', value: 0, delta: 0, spark: [0,0,0,0,0,0,0],
-        info: 'Leads que han entrado hoy y todavía no has contactado.' },
+        info: 'Interesados que han entrado hoy y todavía no has contactado.' },
       { label: 'Contactados', value: 0, delta: 0, spark: [0,0,0,0,0,0,0],
-        info: 'Leads con los que ya has tenido al menos un contacto este mes.' },
+        info: 'Interesados con los que ya has tenido al menos un contacto este mes.' },
       { label: 'Tasa conversión', value: '0%', delta: 0, spark: [0,0,0,0,0,0,0],
-        info: 'De cada 100 leads que entran, cuántos acaban en operación cerrada.' },
+        info: 'De cada 100 interesados que entran, cuántos acaban en operación cerrada.' },
       { label: 'Comisión prevista', value: '0 €', delta: 0, spark: [0,0,0,0,0,0,0],
         info: 'Comisión estimada por propiedades activas.' },
     ],
     funnel: [
-      { label: 'Leads recibidos', value: 0, color: '#2E75B6' },
+      { label: 'Interesados recibidos', value: 0, color: '#2E75B6' },
       { label: 'Contactados', value: 0, color: '#4f8fc7' },
-      { label: 'Interesados', value: 0, color: '#F5A623' },
+      { label: 'En seguimiento', value: 0, color: '#F5A623' },
       { label: 'Visitas', value: 0, color: '#e89515' },
       { label: 'Cerrados', value: 0, color: '#5cb338' },
     ],

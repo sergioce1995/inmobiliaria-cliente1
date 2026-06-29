@@ -102,7 +102,7 @@
                       <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f0fdf4', borderRadius: 10 }}>
                         <Icon name="calendar" size={16} style={{ color: 'var(--green)' }} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{lead ? lead.nombre : (v.lead_name || 'Lead')}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{lead ? lead.nombre : (v.lead_name || 'Interesado')}</div>
                           <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{new Date(v.scheduled_for).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
                         </div>
                       </div>

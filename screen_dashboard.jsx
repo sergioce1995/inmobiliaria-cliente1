@@ -99,16 +99,16 @@
         <div className="panel">
           <div className="panel-head">
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <h3>Estado de los leads</h3>
-              <Tooltip label="Cuántos leads tienes en cada etapa: nuevos, contactados, con visita y cerrados." wide><i className="info-i">i</i></Tooltip>
+              <h3>Estado de los interesados</h3>
+              <Tooltip label="Cuántos interesados tienes en cada etapa: nuevos, contactados, con visita y cerrados." wide><i className="info-i">i</i></Tooltip>
             </div>
-            <span className="ph-sub">{analytics.funnel.reduce((a, f) => a + (f.value || 0), 0)} leads en total</span>
+            <span className="ph-sub">{analytics.funnel.reduce((a, f) => a + (f.value || 0), 0)} interesados en total</span>
           </div>
           <Funnel data={analytics.funnel} />
         </div>
 
         <div className="panel">
-          <div className="panel-head"><h3>Fuentes de leads</h3></div>
+          <div className="panel-head"><h3>Fuentes de interesados</h3></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <Donut data={analytics.sources} size={170} thickness={24} unit="%" centerLabel="Fuentes" />
             <div className="legend" style={{ flex: 1 }}>
@@ -372,7 +372,7 @@
         <div className="page-head">
           <div className="ph-l">
             <h1 className="t-h1">Análisis</h1>
-            <span className="sub">{tab === 'rendimiento' ? 'Cómo está funcionando tu cartera de leads' : 'Ventas, alquileres e ingresos por comisión'}</span>
+            <span className="sub">{tab === 'rendimiento' ? 'Cómo está funcionando tu cartera de interesados' : 'Ventas, alquileres e ingresos por comisión'}</span>
           </div>
           <div className="toolbar">
             {tab === 'rendimiento' && (

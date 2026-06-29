@@ -150,6 +150,7 @@ function Hero({ count, onScrollTo }) {
       <div className="hero-copy">
         <div className="eyebrow" style={{ marginBottom: '1.25rem' }}>Inmobiliaria · Tenerife</div>
         <h1>Encuentra tu hogar<br /><em>donde vive el sol.</em></h1>
+        <p>Tu agente inmobiliario de confianza en Tenerife y Canarias. Pisos, casas, áticos y locales en venta y alquiler con atención personalizada.</p>
         <div className="hero-cta">
           <button className="hero-btn" onClick={() => onScrollTo('catalogo')}>
             Ver catálogo <Icon.Arrow />
