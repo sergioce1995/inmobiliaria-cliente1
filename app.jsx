@@ -235,7 +235,7 @@ function AboutSection() {
         <div>
           <div className="eyebrow" style={{ marginBottom: '1rem' }}>Sobre Paula Gutiérrez</div>
           <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)', marginBottom: '1.25rem' }}>
-            Inmobiliaria humana,<br />tecnología cuidada.
+            Profesionalidad y valor humano
           </h2>
           <p style={{ color: 'var(--ink-2)', fontSize: '1rem', marginBottom: '1.5rem', maxWidth: '46ch' }}>
             Somos un equipo pequeño con base en Tenerife. Trabajamos con pocas propiedades, todas verificadas, y un proceso transparente para compradores, inquilinos y propietarios.
@@ -248,10 +248,6 @@ function AboutSection() {
             <div>
               <div style={{ fontFamily: 'Syne', fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.025em' }}>1.200+</div>
               <div style={{ fontSize: '0.78rem', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Operaciones</div>
-            </div>
-            <div>
-              <div style={{ fontFamily: 'Syne', fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.025em' }}>0%</div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Comisión oculta</div>
             </div>
           </div>
         </div>
