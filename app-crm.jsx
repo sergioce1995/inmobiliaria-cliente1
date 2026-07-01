@@ -257,10 +257,10 @@
       }
     };
 
-    // Cargar propiedades reales desde la API
+    // Cargar propiedades reales desde la API (incluye todas: disponible, vendidas, alquiladas, etc.)
     const loadProperties = async () => {
       try {
-        const res = await fetch('/api/paula/properties');
+        const res = await fetch('/api/paula/properties?all=true');
         const data = await res.json();
         const list = (data.properties || []).map((p, i) => {
           const tipoLabel = (p.tipo || p.kind || 'piso').toLowerCase();
@@ -279,7 +279,7 @@
             banos: p.baths ?? p.banos ?? 0,
             m2: p.m2 ?? p.metros_cuadrados ?? 0,
             unidad_superficie: p.unidad_superficie || 'm²',
-            estado: p.tag === 'reservado' ? 'Reservado' : (p.tag === 'vendido' || p.tag === 'alquilado' ? 'Vendido' : 'Disponible'),
+            estado: p.estado || (p.tag === 'reservado' ? 'Reservado' : (p.tag === 'vendido' ? 'Vendido' : (p.tag === 'alquilado' ? 'Alquilado' : 'Disponible'))),
             estado_raw: p.tag || 'disponible',
             web: true,
             views: 0,
@@ -646,6 +646,32 @@
       const zonas = Array.from(new Set(properties.map((p) => p.ciudad || p.zona).filter(Boolean)));
       const tipos = Array.from(new Set(properties.map((p) => p.tipo).filter(Boolean)));
 
+      // Operaciones cerradas: propiedades Vendidas y Alquiladas
+      const propVendidas = properties.filter((p) => p.estado === 'Vendido');
+      const propAlquiladas = properties.filter((p) => p.estado === 'Alquilado');
+      const operacionesRaw = [
+        ...propVendidas.map((p) => ({
+          id: p.id,
+          regimen: 'Venta',
+          tipo: p.tipo || 'piso',
+          zona: p.ciudad || p.zona || 'Tenerife',
+          precio: p.precio_venta || 0,
+          comision: Math.round((p.precio_venta || 0) * (p.comision || 3) / 100),
+          dias: 0,
+          created_at: p.updated_at || p.created_at,
+        })),
+        ...propAlquiladas.map((p) => ({
+          id: p.id,
+          regimen: 'Alquiler',
+          tipo: p.tipo || 'piso',
+          zona: p.ciudad || p.zona || 'Tenerife',
+          precio: p.precio_alquiler || 0,
+          comision: Math.round((p.precio_alquiler || 0) * (p.comision || 3) / 100),
+          dias: 0,
+          created_at: p.updated_at || p.created_at,
+        })),
+      ];
+
       return {
         ...base,
         kpis, funnel, sources, insights,
@@ -653,7 +679,7 @@
           ...base.operaciones,
           zonas,
           tipos: tipos.length ? tipos : base.operaciones.tipos,
-          raw: [],
+          raw: operacionesRaw,
         },
       };
     })();

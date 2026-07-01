@@ -44,11 +44,11 @@ function App() {
   const [loading, setLoading] = React.useState(true);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  // Cargar propiedades desde API
+  // Cargar propiedades desde API (polling cada 10s para reflejar cambios en tiempo real)
   React.useEffect(() => {
     const loadProperties = async () => {
       try {
-        const response = await fetch('/api/paula/properties');
+        const response = await fetch(`/api/paula/properties?t=${Date.now()}`);
         const result = await response.json();
         // El servidor ya devuelve el shape que la web espera (id, title, type, kind, area, price, rooms, baths, m2, lat, lng, photo, photos, description, address)
         const adapted = (result.properties || []).map((p, i) => ({
@@ -72,6 +72,8 @@ function App() {
       }
     };
     loadProperties();
+    const interval = setInterval(loadProperties, 10000); // Recargar cada 10 segundos
+    return () => clearInterval(interval);
   }, []);
 
   // Filters

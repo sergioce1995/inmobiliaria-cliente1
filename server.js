@@ -1367,13 +1367,20 @@ app.delete('/api/crm/contacts/:id', async (req, res) => {
 // ─ PROPIEDADES: CRUD Endpoints ─
 
 // GET /api/paula/properties - Get Paula's properties (simple endpoint, no auth required)
+// Query params:
+//   ?all=true  → Devuelve TODAS (para CRM)
+//   (sin parámetro) → Devuelve solo Disponible/Reservado (para web pública)
 app.get('/api/paula/properties', async (req, res) => {
   try {
     console.log('[API] Fetching Paula properties...');
 
-    // Get properties with active status only (disponible or reservado) for public web
+    const showAll = req.query.all === 'true';
+    const whereClause = showAll
+      ? ''
+      : `WHERE estado IN ('disponible', 'reservado', 'Disponible', 'Reservado')`;
+    // Get properties (filtered or all based on query param)
     const properties = await dbAll(
-      `SELECT id, client_id, titulo, direccion, tipo, precio_venta, precio_alquiler, habitaciones, banos, metros_cuadrados, unidad_superficie, zona, ciudad, descripcion, caracteristicas, estado, latitud, longitud, created_at, updated_at FROM properties WHERE LOWER(estado) IN ('disponible', 'reservado') ORDER BY created_at DESC`,
+      `SELECT id, client_id, titulo, direccion, tipo, precio_venta, precio_alquiler, habitaciones, banos, metros_cuadrados, unidad_superficie, zona, ciudad, descripcion, caracteristicas, estado, latitud, longitud, created_at, updated_at FROM properties ${whereClause} ORDER BY created_at DESC`,
       []
     );
 

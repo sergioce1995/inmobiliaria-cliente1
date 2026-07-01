@@ -141,7 +141,8 @@ table.ztable { width: 100%; border-collapse: collapse; }
 .prop-pill { padding: 5px 11px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,.95); backdrop-filter: blur(6px); box-shadow: var(--sh-xs); }
 .prop-pill.disp { color: var(--green-600); }
 .prop-pill.res { color: var(--orange-600); }
-.prop-pill.vend { color: var(--ink-3); }
+.prop-pill.vend { color: #c0392b; }
+.prop-pill.alq { color: #0ea5a3; }
 .prop-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
 .prop-title { font-weight: 700; font-size: 16px; letter-spacing: -.01em; color: var(--ink); }
 .prop-loc { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-3); margin-top: 2px; }

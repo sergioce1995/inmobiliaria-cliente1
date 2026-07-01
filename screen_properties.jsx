@@ -136,7 +136,7 @@
     );
   }
 
-  const STATUS_CLASS = { 'Disponible': 'disp', 'Reservado': 'res', 'Vendido': 'vend' };
+  const STATUS_CLASS = { 'Disponible': 'disp', 'Reservado': 'res', 'Vendido': 'vend', 'Alquilado': 'alq' };
 
   // ─── CARD ────────────────────────────────────────────────────────
   function PropCard({ p, onShare, onEdit, onDelete, interesados = 0, onOpenDetail }) {
