@@ -279,7 +279,7 @@
             banos: p.baths ?? p.banos ?? 0,
             m2: p.m2 ?? p.metros_cuadrados ?? 0,
             unidad_superficie: p.unidad_superficie || 'm²',
-            estado: p.estado || (p.tag === 'reservado' ? 'Reservado' : (p.tag === 'vendido' ? 'Vendido' : (p.tag === 'alquilado' ? 'Alquilado' : 'Disponible'))),
+            estado: p.estado ? (p.estado.charAt(0).toUpperCase() + p.estado.slice(1).toLowerCase()) : (p.tag === 'reservado' ? 'Reservado' : (p.tag === 'vendido' ? 'Vendido' : (p.tag === 'alquilado' ? 'Alquilado' : 'Disponible'))),
             estado_raw: p.tag || 'disponible',
             web: true,
             views: 0,

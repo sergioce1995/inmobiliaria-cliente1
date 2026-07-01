@@ -138,11 +138,11 @@ table.ztable { width: 100%; border-collapse: collapse; }
 .prop-img image-slot { width: 100%; height: 100%; display: block; }
 .prop-price { position: absolute; right: 14px; bottom: 14px; background: rgba(255,255,255,.95); backdrop-filter: blur(6px); padding: 7px 13px; border-radius: var(--r-pill); font-weight: 800; font-size: 16px; letter-spacing: -.02em; color: var(--ink); box-shadow: var(--sh-sm); }
 .prop-status { position: absolute; right: 14px; top: 14px; }
-.prop-pill { padding: 6px 12px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 700; box-shadow: var(--sh-xs); }
-.prop-pill.disp { background: var(--green-600); color: white; }
-.prop-pill.res { background: var(--orange-600); color: white; }
-.prop-pill.vend { background: #c0392b; color: white; }
-.prop-pill.alq { background: #0ea5a3; color: white; }
+.prop-pill { padding: 6px 12px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 700; box-shadow: var(--sh-xs); display: inline-block; }
+.prop-pill.disp { background: #4a9a2c !important; color: white !important; }
+.prop-pill.res { background: #f59e0b !important; color: white !important; }
+.prop-pill.vend { background: #dc2626 !important; color: white !important; }
+.prop-pill.alq { background: #0891b2 !important; color: white !important; }
 .prop-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
 .prop-title { font-weight: 700; font-size: 16px; letter-spacing: -.01em; color: var(--ink); }
 .prop-loc { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
