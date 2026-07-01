@@ -1371,9 +1371,9 @@ app.get('/api/paula/properties', async (req, res) => {
   try {
     console.log('[API] Fetching Paula properties...');
 
-    // Get properties with active status only (Disponible or Reservada)
+    // Get ALL properties (for Paula - single client for now)
     const properties = await dbAll(
-      `SELECT id, client_id, titulo, direccion, tipo, precio_venta, precio_alquiler, habitaciones, banos, metros_cuadrados, unidad_superficie, zona, ciudad, descripcion, caracteristicas, estado, latitud, longitud, created_at, updated_at FROM properties WHERE estado IN ('Disponible', 'Reservada') ORDER BY created_at DESC`,
+      `SELECT id, client_id, titulo, direccion, tipo, precio_venta, precio_alquiler, habitaciones, banos, metros_cuadrados, unidad_superficie, zona, ciudad, descripcion, caracteristicas, estado, latitud, longitud, created_at, updated_at FROM properties ORDER BY created_at DESC`,
       []
     );
 
