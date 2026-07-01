@@ -1,54 +1,36 @@
-// screen_dashboard.jsx
+// screen_dashboard.jsx — Fase 4: Dashboard simplificado + narrativa inteligente
 (function () {
-  const { Icon, Sparkline, Donut, Funnel, LineChart, ComboChart, OpsBarChart, HBars, Tabs, Tooltip, Button } = window;
-  const { useState } = React;
+  const { Icon, Funnel, LineChart, HBars, Button, Tooltip } = window;
+  const { useState, useMemo } = React;
   const fmtEur = window.fmtEur;
 
+  // ── KPI CARD ──────────────────────────────────────────────────────────
   function KpiCard({ k }) {
     return (
       <div className="kpi">
-        <div className="k-label">
-          {k.label}
-          {k.info && <Tooltip label={k.info} wide><i className="info-i">i</i></Tooltip>}
-        </div>
+        <div className="k-label">{k.label}</div>
         <div className="k-val tnum" style={{ marginTop: 10 }}>{k.value}</div>
       </div>
     );
   }
 
-  // KPI simple (sin delta) para la pestaña de operaciones
-  function StatCard({ s }) {
-    return (
-      <div className="kpi">
-        <div className="k-label">
-          {s.label}
-          {s.info && <Tooltip label={s.info} wide><i className="info-i">i</i></Tooltip>}
-        </div>
-        <div className="k-val tnum" style={{ marginTop: 8 }}>{s.value}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>{s.sub}</div>
-      </div>
-    );
-  }
-
-  // ── Simulador de ingresos ──────────────────────────────────────────────
+  // ── SIMULADOR DE INGRESOS ─────────────────────────────────────────────
   function IncomeSimulator({ properties }) {
-    const sellable = properties.filter((p) => p.estado !== 'Vendido');
-    const [sel, setSel] = useState(() => sellable.filter((p) => p.estado === 'Disponible').map((p) => p.id));
-    const [comm, setComm] = useState(() => Object.fromEntries(sellable.map((p) => [p.id, p.comision])));
+    const sellable = properties.filter((p) => p.estado !== 'Vendido' && p.estado !== 'Alquilado');
+    const [sel, setSel] = useState(() => sellable.slice(0, 3).map((p) => p.id));
+    const [comm, setComm] = useState(() => Object.fromEntries(sellable.map((p) => [p.id, p.comision || 3])));
     const [prob, setProb] = useState(100);
 
     const toggle = (id) => setSel((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
-    const commOf = (p) => Math.round(p.precio * (comm[p.id] ?? p.comision) / 100);
+    const commOf = (p) => Math.round(p.precio * (comm[p.id] ?? (p.comision || 3)) / 100);
     const total = sellable.filter((p) => sel.includes(p.id)).reduce((s, p) => s + commOf(p), 0);
     const weighted = Math.round(total * prob / 100);
 
     return (
       <div className="panel sim">
         <div className="panel-head">
-          <div>
-            <h3>Simulador de ingresos</h3>
-          </div>
-          <span className="ph-sub">Comisión si cierras estas operaciones</span>
+          <h3>💰 Simulador de ingresos</h3>
+          <span className="ph-sub">Selecciona propiedades y estima tu comisión</span>
         </div>
 
         <div className="sim-list">
@@ -63,7 +45,7 @@
                 </div>
                 <div className="sim-comm">
                   <div className="sim-comm-in">
-                    <input type="number" min="0" max="10" step="0.5" value={comm[p.id] ?? p.comision}
+                    <input type="number" min="0" max="10" step="0.5" value={comm[p.id] ?? (p.comision || 3)}
                       onChange={(e) => setComm((c) => ({ ...c, [p.id]: e.target.value === '' ? '' : +e.target.value }))} />
                     <span>%</span>
                   </div>
@@ -92,309 +74,196 @@
     );
   }
 
-  // ── Pestaña: Rendimiento (leads) ──
-  function PerfView({ analytics, properties, onAction }) {
-    return (<>
-      <div className="dash-grid">
-        <div className="panel">
-          <div className="panel-head">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <h3>Estado de los interesados</h3>
-              <Tooltip label="Cuántos interesados tienes en cada etapa: nuevos, contactados, con visita y cerrados." wide><i className="info-i">i</i></Tooltip>
-            </div>
-            <span className="ph-sub">{analytics.funnel.reduce((a, f) => a + (f.value || 0), 0)} interesados en total</span>
-          </div>
-          <Funnel data={analytics.funnel} />
-        </div>
+  // ── RESUMEN INTELIGENTE (Narrativa automática) ─────────────────────────
+  function SmartSummary({ analytics, properties }) {
+    const lines = [];
 
-        <div className="panel">
-          <div className="panel-head"><h3>Fuentes de interesados</h3></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <Donut data={analytics.sources} size={170} thickness={24} unit="%" centerLabel="Fuentes" />
-            <div className="legend" style={{ flex: 1 }}>
-              {analytics.sources.map((s, i) => (
-                <div className="legend-item" key={i}>
-                  <span className="ld" style={{ background: s.color }} />
-                  <span className="ll">{s.label}</span>
-                  <span className="lv">{s.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
-        <IncomeSimulator properties={properties} />
-      </div>
-    </>);
-  }
-
-  // ── Pestaña: Operaciones — HERRAMIENTA DE ANÁLISIS INTERACTIVA ──
-  function OpsView({ ops }) {
-    const { useState, useMemo } = React;
-    const meses = ops.meses;
-    const [fRegimen, setFRegimen] = useState('todos');   // 'todos' | 'Venta' | 'Alquiler'
-    const [fTipo, setFTipo] = useState('todos');
-    const [fZona, setFZona] = useState('todos');
-    const [fMes, setFMes] = useState('todos');
-    const [showV, setShowV] = useState(true);
-    const [showA, setShowA] = useState(true);
-    const [showC, setShowC] = useState(true);
-    const [sort, setSort] = useState({ k: 'comision', dir: -1 });
-
-    // Filtro maestro: TODO se calcula sobre este subconjunto.
-    const rows = useMemo(() => ops.raw.filter((o) =>
-      (fRegimen === 'todos' || o.regimen === fRegimen) &&
-      (fTipo === 'todos' || o.tipo === fTipo) &&
-      (fZona === 'todos' || o.zona === fZona) &&
-      (fMes === 'todos' || o.mes === fMes)
-    ), [fRegimen, fTipo, fZona, fMes, ops.raw]);
-
-    // Agregados derivados del subconjunto filtrado
-    const agg = useMemo(() => {
-      const ventas = meses.map(() => 0), alquileres = meses.map(() => 0), comisionMes = meses.map(() => 0);
-      const tipoMap = {}, zonaOps = {}, zonaIng = {};
-      let totalComision = 0, sumVenta = 0, nVenta = 0, sumDias = 0;
-      rows.forEach((o) => {
-        const mi = o.mesIdx;
-        if (o.regimen === 'Venta') { ventas[mi]++; sumVenta += o.precio; nVenta++; }
-        else alquileres[mi]++;
-        comisionMes[mi] += o.comision / 1000;
-        tipoMap[o.tipo] = (tipoMap[o.tipo] || 0) + 1;
-        zonaOps[o.zona] = (zonaOps[o.zona] || 0) + 1;
-        zonaIng[o.zona] = (zonaIng[o.zona] || 0) + o.comision / 1000;
-        totalComision += o.comision;
-        sumDias += o.dias;
+    if (analytics.operaciones?.raw) {
+      const ops = analytics.operaciones.raw;
+      const thisMonth = new Date().getMonth();
+      const thisYear = new Date().getFullYear();
+      const monthOps = ops.filter(o => {
+        const d = new Date(o.created_at);
+        return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
       });
-      return {
-        ventas, alquileres, comisionMes: comisionMes.map((v) => Math.round(v)),
-        tipos: ops.tipos.map((t) => ({ label: t, value: tipoMap[t] || 0, color: ops.tipoColor[t] })),
-        regimen: [
-          { label: 'Venta', value: rows.filter((o) => o.regimen === 'Venta').length, color: '#2E75B6' },
-          { label: 'Alquiler', value: rows.filter((o) => o.regimen === 'Alquiler').length, color: '#0ea5a3' },
-        ],
-        zonasOps: ops.zonas.map((z) => ({ label: z, value: zonaOps[z] || 0, color: '#2E75B6' })),
-        zonasIng: ops.zonas.map((z) => ({ label: z, value: Math.round(zonaIng[z] || 0), color: '#5cb338' })),
-        count: rows.length, totalComision,
-        ticket: nVenta ? Math.round(sumVenta / nVenta) : 0,
-        dias: rows.length ? Math.round(sumDias / rows.length) : 0,
-      };
-    }, [rows]);
 
-    // Toggle de filtro: volver a pulsar el mismo valor lo desactiva.
-    const tog = (cur, set) => (val) => set(cur === val ? 'todos' : val);
-    const anyFilter = fRegimen !== 'todos' || fTipo !== 'todos' || fZona !== 'todos' || fMes !== 'todos';
-    const clearAll = () => { setFRegimen('todos'); setFTipo('todos'); setFZona('todos'); setFMes('todos'); };
+      const ventas = monthOps.filter(o => o.regimen === 'Venta').length;
+      const alquileres = monthOps.filter(o => o.regimen === 'Alquiler').length;
 
-    const sortedRows = useMemo(() => [...rows].sort((a, b) => {
-      const av = a[sort.k], bv = b[sort.k];
-      if (typeof av === 'number') return (av - bv) * sort.dir;
-      return String(av).localeCompare(String(bv)) * sort.dir;
-    }), [rows, sort]);
-    const setSortK = (k) => setSort((s) => s.k === k ? { k, dir: -s.dir } : { k, dir: 1 });
+      if (ventas > 0 || alquileres > 0) {
+        lines.push(`Este mes has realizado ${ventas} ${ventas === 1 ? 'venta' : 'ventas'} y ${alquileres} ${alquileres === 1 ? 'alquiler' : 'alquileres'}.`);
+      }
 
-    const Chip = ({ active, color, onClick, children }) => (
-      <button className={`ops-chip${active ? ' active' : ''}`} onClick={onClick}
-        style={active && color ? { background: color, borderColor: color } : null}>
-        {color && <span className="ops-chip-dot" style={{ background: active ? '#fff' : color }} />}{children}
-      </button>
+      const totalComm = monthOps.reduce((s, o) => s + (o.comision || 0), 0);
+      if (totalComm > 0) {
+        lines.push(`Has generado ${fmtEur(totalComm)} en comisiones.`);
+      }
+
+      if (ops.length > 0) {
+        const avgDias = Math.round(ops.reduce((s, o) => s + (o.dias || 0), 0) / ops.length);
+        if (avgDias > 0) {
+          lines.push(`La media de cierre de tus operaciones es de ${avgDias} días.`);
+        }
+      }
+    }
+
+    if (properties.length > 0) {
+      const tipos = {};
+      properties.forEach(p => { tipos[p.tipo] = (tipos[p.tipo] || 0) + 1; });
+      const topTipo = Object.entries(tipos).sort((a, b) => b[1] - a[1])[0];
+      if (topTipo) {
+        const pct = Math.round(topTipo[1] / properties.length * 100);
+        lines.push(`Los ${topTipo[0]}s representan el ${pct}% de tu cartera.`);
+      }
+    }
+
+    return (
+      <div style={{ background: 'linear-gradient(135deg, #f0f6fc, #fbfcfe)', border: '1px solid var(--blue-100)', borderRadius: 'var(--r-lg)', padding: '20px 22px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Icon name="sparkle" size={16} style={{ color: 'var(--blue)' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Resumen</span>
+        </div>
+        <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {lines.length > 0 ? lines.map((line, i) => <p key={i} style={{ margin: 0 }}>{line}</p>) : <p style={{ margin: 0, color: 'var(--ink-3)' }}>Sin datos aún. Agrega operaciones para ver el análisis.</p>}
+        </div>
+      </div>
     );
-
-    return (<>
-      {/* ── Barra de multifiltro ── */}
-      <div className="ops-filters card">
-        <div className="ops-fgroup">
-          <span className="ops-flabel">Régimen</span>
-          <div className="ops-chips">
-            <Chip active={fRegimen === 'Venta'} color="#2E75B6" onClick={() => tog(fRegimen, setFRegimen)('Venta')}>Venta</Chip>
-            <Chip active={fRegimen === 'Alquiler'} color="#0ea5a3" onClick={() => tog(fRegimen, setFRegimen)('Alquiler')}>Alquiler</Chip>
-          </div>
-        </div>
-        <div className="ops-fdiv" />
-        <div className="ops-fgroup">
-          <span className="ops-flabel">Tipo</span>
-          <div className="ops-chips">
-            {ops.tipos.map((t) => (
-              <Chip key={t} active={fTipo === t} color={ops.tipoColor[t]} onClick={() => tog(fTipo, setFTipo)(t)}>{t}</Chip>
-            ))}
-          </div>
-        </div>
-        <div className="ops-fdiv" />
-        <div className="ops-fgroup">
-          <span className="ops-flabel">Ciudad</span>
-          <div className="ops-chips">
-            {ops.zonas.map((z) => (
-              <Chip key={z} active={fZona === z} onClick={() => tog(fZona, setFZona)(z)}>{z}</Chip>
-            ))}
-          </div>
-        </div>
-        {anyFilter && (
-          <button className="ops-clear" onClick={clearAll}><Icon name="close" size={14} />Limpiar filtros</button>
-        )}
-      </div>
-
-      {/* Resumen del subconjunto filtrado */}
-      <div className="ops-summary">
-        <Icon name="filter" size={15} />
-        <span>Mostrando <b>{agg.count}</b> {agg.count === 1 ? 'operación' : 'operaciones'}
-          {fRegimen !== 'todos' && <> · <b>{fRegimen}</b></>}
-          {fTipo !== 'todos' && <> · <b>{fTipo}</b></>}
-          {fZona !== 'todos' && <> · <b>{fZona}</b></>}
-          {fMes !== 'todos' && <> · <b>{fMes}</b></>}
-        </span>
-      </div>
-
-      <div className="kpi-row">
-        <StatCard s={{ label: 'Operaciones', value: agg.count, sub: anyFilter ? 'con estos filtros' : 'este año', info: 'Número de operaciones que cumplen los filtros activos.' }} />
-        <StatCard s={{ label: 'Ingresos por comisión', value: fmtEur(agg.totalComision).replace(' €', '') + ' €', sub: 'suma filtrada', info: 'Suma de comisiones de las operaciones mostradas.' }} />
-        <StatCard s={{ label: 'Ticket medio venta', value: agg.ticket ? fmtEur(agg.ticket).replace(' €', '') + ' €' : '—', sub: 'solo ventas', info: 'Precio medio de las ventas dentro del filtro.' }} />
-        <StatCard s={{ label: 'Días en cartera', value: agg.dias || '—', sub: 'media hasta cerrar', info: 'Tiempo medio desde publicación hasta cierre.' }} />
-      </div>
-
-      {/* Gráfico por mes con series conmutables y clic para filtrar mes */}
-      <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
-        <div className="panel">
-          <div className="panel-head">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <h3>Operaciones por mes</h3>
-              <Tooltip label="Altura de cada barra = nº de operaciones del mes (ventas + alquileres). Pasa el ratón para ver la comisión. Pulsa una columna para filtrar ese mes; pulsa la leyenda para mostrar/ocultar series." wide><i className="info-i">i</i></Tooltip>
-            </div>
-            <div className="chart-legend">
-              <button className={`cl-item tgl${showV ? '' : ' off'}`} onClick={() => setShowV((v) => !v)}><span className="cl-dot" style={{ background: '#2E75B6' }} />Ventas</button>
-              <button className={`cl-item tgl${showA ? '' : ' off'}`} onClick={() => setShowA((v) => !v)}><span className="cl-dot" style={{ background: '#0ea5a3' }} />Alquileres</button>
-            </div>
-          </div>
-          <OpsBarChart meses={meses} ventas={agg.ventas} alquileres={agg.alquileres} comision={agg.comisionMes}
-            onMonth={(m) => setFMes(fMes === m ? 'todos' : m)} activeMonth={fMes !== 'todos' ? fMes : null}
-            showV={showV} showA={showA} />
-        </div>
-      </div>
-
-      <div className="dash-grid">
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Por tipo de propiedad</h3>
-            <span className="ph-sub">Pulsa para filtrar</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <Donut data={agg.tipos} size={170} thickness={24} centerLabel="operaciones"
-              onSlice={(l) => setFTipo(fTipo === l ? 'todos' : l)} activeLabel={fTipo !== 'todos' ? fTipo : null} />
-            <div className="legend" style={{ flex: 1 }}>
-              {agg.tipos.map((s, i) => (
-                <div className={`legend-item clickable${fTipo === s.label ? ' on' : ''}`} key={i}
-                  onClick={() => setFTipo(fTipo === s.label ? 'todos' : s.label)}>
-                  <span className="ld" style={{ background: s.color }} />
-                  <span className="ll">{s.label}</span>
-                  <span className="lv">{s.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Venta vs. alquiler · por ciudad</h3>
-            <span className="ph-sub">Pulsa para filtrar</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 6 }}>
-            <HBars data={agg.regimen} unit=" ops"
-              onBar={(l) => setFRegimen(fRegimen === l ? 'todos' : l)} activeLabel={fRegimen !== 'todos' ? fRegimen : null} />
-            <div style={{ borderTop: '1px solid var(--line-2)', paddingTop: 16 }}>
-              <span className="t-eyebrow" style={{ display: 'block', marginBottom: 12 }}>Por ciudad · operaciones</span>
-              <HBars data={agg.zonasOps} unit=" ops"
-                onBar={(l) => setFZona(fZona === l ? 'todos' : l)} activeLabel={fZona !== 'todos' ? fZona : null} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Ingresos por ciudad</h3>
-            <span className="ph-sub">Comisión filtrada (miles €) · pulsa para filtrar</span>
-          </div>
-          <HBars data={agg.zonasIng} unit="k €"
-            onBar={(l) => setFZona(fZona === l ? 'todos' : l)} activeLabel={fZona !== 'todos' ? fZona : null} />
-        </div>
-      </div>
-
-      {/* Tabla de resultados — refleja los filtros */}
-      <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
-        <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="panel-head" style={{ padding: '20px 22px 16px', margin: 0 }}>
-            <h3>Detalle de operaciones</h3>
-            <span className="ph-sub">{sortedRows.length} resultados</span>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="ztable ops-table">
-              <thead>
-                <tr>
-                  <th onClick={() => setSortK('id')}>Ref.</th>
-                  <th onClick={() => setSortK('tipo')}>Tipo</th>
-                  <th onClick={() => setSortK('regimen')}>Régimen</th>
-                  <th onClick={() => setSortK('zona')}>Ciudad</th>
-                  <th onClick={() => setSortK('mesIdx')}>Mes</th>
-                  <th onClick={() => setSortK('precio')} style={{ textAlign: 'right' }}>Precio</th>
-                  <th onClick={() => setSortK('comision')} style={{ textAlign: 'right' }}>Comisión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((o) => (
-                  <tr key={o.id}>
-                    <td className="cell-mut mono">{o.id}</td>
-                    <td><span className="op-tipo"><span className="op-dot" style={{ background: ops.tipoColor[o.tipo] }} />{o.tipo}</span></td>
-                    <td><span className={`op-reg ${o.regimen === 'Venta' ? 'v' : 'a'}`}>{o.regimen}</span></td>
-                    <td>{o.zona}</td>
-                    <td className="cell-mut">{o.mes}</td>
-                    <td className="tnum" style={{ textAlign: 'right' }}>{o.regimen === 'Venta' ? fmtEur(o.precio) : fmtEur(o.precio) + '/mes'}</td>
-                    <td className="tnum cell-budget" style={{ textAlign: 'right' }}>{fmtEur(o.comision)}</td>
-                  </tr>
-                ))}
-                {sortedRows.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px', color: 'var(--ink-3)' }}>Ninguna operación con estos filtros. Prueba a quitar alguno.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </>);
   }
 
+  // ── DASHBOARD PRINCIPAL ────────────────────────────────────────────────
   function DashboardScreen({ analytics, properties, onAction }) {
-    const [tab, setTab] = useState('rendimiento');
-    const [range, setRange] = useState('30d');
+    const activeProps = useMemo(() => properties.filter(p => p.estado !== 'Vendido' && p.estado !== 'Alquilado'), [properties]);
+    const soldProps = useMemo(() => properties.filter(p => p.estado === 'Vendido'), [properties]);
+    const rentedProps = useMemo(() => properties.filter(p => p.estado === 'Alquilado'), [properties]);
+
+    const avgCloseDays = useMemo(() => {
+      if (!analytics.operaciones?.raw?.length) return '—';
+      const avg = Math.round(analytics.operaciones.raw.reduce((s, o) => s + (o.dias || 0), 0) / analytics.operaciones.raw.length);
+      return avg > 0 ? `${avg}d` : '—';
+    }, [analytics.operaciones]);
+
+    // Qué estás vendiendo: por tipo
+    const propsByType = useMemo(() => {
+      const map = {};
+      activeProps.forEach(p => { map[p.tipo] = (map[p.tipo] || 0) + 1; });
+      return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([tipo, count]) => ({ label: tipo, value: count }));
+    }, [activeProps]);
+
+    // Qué estás vendiendo: por ciudad
+    const propsByCity = useMemo(() => {
+      const map = {};
+      activeProps.forEach(p => { map[p.ciudad] = (map[p.ciudad] || 0) + 1; });
+      return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([city, count]) => ({ label: city, value: count }));
+    }, [activeProps]);
+
+    // Operaciones cerradas
+    const closedOps = useMemo(() => {
+      const ops = analytics.operaciones?.raw || [];
+      const ventas = ops.filter(o => o.regimen === 'Venta').length;
+      const alquileres = ops.filter(o => o.regimen === 'Alquiler').length;
+      const comision = ops.reduce((s, o) => s + (o.comision || 0), 0);
+      return { ventas, alquileres, comision };
+    }, [analytics.operaciones]);
+
     return (
       <div className="page">
         <div className="page-head">
-          <div className="ph-l">
-            <h1 className="t-h1">Análisis</h1>
-            <span className="sub">{tab === 'rendimiento' ? 'Cómo está funcionando tu cartera de interesados' : 'Ventas, alquileres e ingresos por comisión'}</span>
-          </div>
-          <div className="toolbar">
-            {tab === 'rendimiento' && (
-              <Tabs value={range} onChange={setRange} options={[
-                { value: '7d', label: '7 días' }, { value: '30d', label: '30 días' }, { value: '90d', label: '90 días' },
-              ]} />
-            )}
+          <div>
+            <h1 className="t-h1">Rendimiento</h1>
+            <span className="sub">Todo lo que necesitas saber sobre tu negocio inmobiliario</span>
           </div>
         </div>
 
-        <div className="dash-tabs">
-          <button className={`dash-tab${tab === 'rendimiento' ? ' active' : ''}`} onClick={() => setTab('rendimiento')}>
-            <Icon name="dashboard" size={18} />Rendimiento
-          </button>
-          <button className={`dash-tab${tab === 'operaciones' ? ' active' : ''}`} onClick={() => setTab('operaciones')}>
-            <Icon name="trend" size={18} />Operaciones e ingresos
-          </button>
+        {/* Resumen inteligente */}
+        <SmartSummary analytics={analytics} properties={activeProps} />
+
+        {/* Resumen del negocio — 4 KPIs clave */}
+        <div className="kpi-row">
+          <KpiCard k={{ label: 'Propiedades activas', value: activeProps.length }} />
+          <KpiCard k={{ label: 'Propiedades vendidas', value: soldProps.length }} />
+          <KpiCard k={{ label: 'Propiedades alquiladas', value: rentedProps.length }} />
+          <KpiCard k={{ label: 'Tiempo medio de cierre', value: avgCloseDays }} />
         </div>
 
-        {tab === 'rendimiento'
-          ? <PerfView analytics={analytics} properties={properties} onAction={onAction} />
-          : <OpsView ops={analytics.operaciones} />}
+        {/* Estado de los interesados */}
+        {analytics.funnel && (
+          <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
+            <div className="panel">
+              <div className="panel-head">
+                <h3>📊 Estado de los interesados</h3>
+                <span className="ph-sub">{analytics.funnel.reduce((a, f) => a + (f.value || 0), 0)} interesados en total</span>
+              </div>
+              <Funnel data={analytics.funnel} />
+            </div>
+          </div>
+        )}
+
+        {/* Qué estás vendiendo */}
+        <div className="dash-grid">
+          <div className="panel">
+            <div className="panel-head"><h3>🏠 Por tipo de propiedad</h3></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {propsByType.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{p.label}</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {Array(p.value).fill(0).map((_, j) => (
+                        <div key={j} style={{ width: 12, height: 12, background: 'var(--blue)', borderRadius: 2 }} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 800, minWidth: 30, textAlign: 'right', color: 'var(--blue)' }}>{p.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head"><h3>📍 Por ciudad</h3></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {propsByCity.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{p.label}</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {Array(p.value).fill(0).map((_, j) => (
+                        <div key={j} style={{ width: 12, height: 12, background: '#5cb338', borderRadius: 2 }} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 800, minWidth: 30, textAlign: 'right', color: '#5cb338' }}>{p.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Operaciones cerradas */}
+        <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
+          <div className="panel">
+            <div className="panel-head"><h3>✅ Operaciones cerradas</h3></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div style={{ background: 'var(--blue-50)', padding: '16px 12px', borderRadius: 'var(--r-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Ventas</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--blue)' }}>{closedOps.ventas}</div>
+              </div>
+              <div style={{ background: '#e7f6f5', padding: '16px 12px', borderRadius: 'var(--r-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0ea5a3', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Alquileres</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: '#0ea5a3' }}>{closedOps.alquileres}</div>
+              </div>
+              <div style={{ background: '#f0fdf4', padding: '16px 12px', borderRadius: 'var(--r-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#5cb338', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Comisión</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#5cb338' }}>{fmtEur(closedOps.comision).replace(' €', '')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Simulador de ingresos — más protagonismo */}
+        <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
+          <IncomeSimulator properties={properties} />
+        </div>
       </div>
     );
   }
