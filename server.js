@@ -637,6 +637,7 @@ app.post('/api/interested', async (req, res) => {
   try {
     const { fullName, lastName, email, phone, propertyRef } = req.body;
 
+    // ─ GOOGLE SHEETS: Guardar en Interesados ─
     const doc = new GoogleSpreadsheet(SHEET_ID, auth);
     await doc.loadInfo();
 
@@ -645,7 +646,6 @@ app.post('/api/interested', async (req, res) => {
       return res.status(404).json({ error: 'Hoja Interesados no encontrada' });
     }
 
-    // Formatear fecha como DD/MM/YYYY HH:mm:ss (igual al anterior)
     const now = new Date();
     const dia = String(now.getDate()).padStart(2, '0');
     const mes = String(now.getMonth() + 1).padStart(2, '0');
@@ -655,7 +655,6 @@ app.post('/api/interested', async (req, res) => {
     const segundos = String(now.getSeconds()).padStart(2, '0');
     const fechaFormato = `${dia}/${mes}/${año} ${horas}:${minutos}:${segundos}`;
 
-    // Guardar en orden correcto: Inmueble, Nombre, Apellidos, Email, Teléfono, Fecha y hora, Estado
     await sheet.addRow({
       'Inmueble': propertyRef,
       'Nombre': fullName,
@@ -666,38 +665,74 @@ app.post('/api/interested', async (req, res) => {
       'Estado': '',
     });
 
-    // NUEVO: Guardar también en SQLite (para CRM)
-    // TODO: En producción, obtener client_id del contexto del usuario
-    const clientId = 'client-123'; // Demo: hardcodeado para testing
-    const leadId = uuidv4();
+    // ─ CRM: Nueva arquitectura Lead/Interés ─
+    const clientId = 'default-client'; // En producción, obtener del usuario
     const nowISO = new Date().toISOString();
 
-    console.log(`🔄 Intentando guardar lead en CRM: ${fullName} (${email})`);
-
     try {
-      // Guardar lead
-      await dbRun(
-        `INSERT INTO leads (id, client_id, nombre, apellidos, email, telefono, origin, source_property_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [leadId, clientId, fullName, lastName, email, phone, 'web_form', propertyRef, 'nuevo', nowISO, nowISO]
+      // Paso 1: Buscar si el lead ya existe por email
+      const existingLead = await dbGet(
+        'SELECT id FROM leads WHERE client_id = ? AND email = ?',
+        [clientId, email]
       );
-      console.log(`✅ Lead guardado en CRM: ${fullName} - ${email}`);
 
-      // NUEVO: Guardar también como contacto (automáticamente)
-      const contactId = uuidv4();
-      await dbRun(
-        `INSERT INTO contacts (id, client_id, nombre, apellidos, email, telefono, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [contactId, clientId, fullName, lastName, email, phone, nowISO, nowISO]
+      let leadId;
+
+      if (existingLead) {
+        // Lead ya existe: reutilizar su ID
+        leadId = existingLead.id;
+        console.log(`🔄 Lead existente encontrado: ${email}`);
+      } else {
+        // Lead nuevo: crear
+        leadId = uuidv4();
+        await dbRun(
+          `INSERT INTO leads (id, client_id, nombre, apellidos, email, telefono, origin, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [leadId, clientId, fullName, lastName, email, phone, 'web_form', 'nuevo', nowISO, nowISO]
+        );
+        console.log(`✅ Lead nuevo creado: ${email}`);
+
+        // Crear contacto automáticamente para leads nuevos
+        const contactId = uuidv4();
+        await dbRun(
+          `INSERT INTO contacts (id, client_id, nombre, apellidos, email, telefono, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [contactId, clientId, fullName, lastName, email, phone, nowISO, nowISO]
+        );
+        console.log(`✅ Contacto creado: ${fullName}`);
+      }
+
+      // Paso 2: Crear/actualizar interés en la propiedad
+      const existingInteres = await dbGet(
+        'SELECT id FROM intereses WHERE lead_id = ? AND property_id = ?',
+        [leadId, propertyRef]
       );
-      console.log(`✅ Contacto creado automáticamente: ${fullName}`);
+
+      if (existingInteres) {
+        // Interés ya existe: actualizar última actividad
+        await dbRun(
+          'UPDATE intereses SET ultima_actividad = ?, updated_at = ? WHERE id = ?',
+          [nowISO, nowISO, existingInteres.id]
+        );
+        console.log(`🔄 Interés actualizado: ${email} → ${propertyRef}`);
+      } else {
+        // Interés nuevo: crear
+        const interesId = uuidv4();
+        await dbRun(
+          `INSERT INTO intereses (id, client_id, lead_id, property_id, estado, fecha_interes, ultima_actividad, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [interesId, clientId, leadId, propertyRef, 'nuevo', nowISO, nowISO, nowISO, nowISO]
+        );
+        console.log(`✅ Interés nuevo creado: ${email} → ${propertyRef}`);
+      }
+
+      console.log(`✅ Interesado procesado: ${fullName} ${lastName} - ${propertyRef}`);
+      res.json({ success: true, message: 'Interés registrado correctamente' });
     } catch (dbErr) {
-      console.error(`❌ Error guardando en CRM: ${dbErr.message}`);
-      console.error(dbErr);
+      console.error(`❌ Error en CRM: ${dbErr.message}`);
+      // No fallar toda la petición si hay error en CRM (Google Sheets ya se guardó)
+      res.json({ success: true, message: 'Guardado en formulario (error en CRM)', warning: dbErr.message });
     }
-
-    console.log(`✅ Interesado registrado: ${fullName} ${lastName} - ${propertyRef}`);
-    res.json({ success: true, message: 'Interés registrado correctamente' });
   } catch (err) {
     console.error('❌ Error saving interested:', err);
     res.status(500).json({ error: err.message });
