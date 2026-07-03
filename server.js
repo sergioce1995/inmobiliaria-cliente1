@@ -127,31 +127,82 @@ function initializeCRMTables() {
       .filter(f => f.endsWith('.sql'))
       .sort(); // Orden alfabético: 001, 002, 003...
 
-    for (const file of migrationFiles) {
-      const migrationPath = path.join(migrationsDir, file);
-      const sql = fs.readFileSync(migrationPath, 'utf8');
-      const statements = sql.split(';').filter(s => s.trim());
+    // Ejecutar todas las migraciones de forma sincrónica
+    db.serialize(() => {
+      for (const file of migrationFiles) {
+        const migrationPath = path.join(migrationsDir, file);
+        const sql = fs.readFileSync(migrationPath, 'utf8');
+        const statements = sql.split(';').filter(s => s.trim());
 
-      for (const statement of statements) {
-        db.run(statement + ';', (err) => {
-          if (err && !err.message.includes('already exists')) {
-            console.warn(`⚠️ Migration [${file}] warning: ${err.message}`);
-          }
-        });
+        for (const statement of statements) {
+          db.run(statement + ';', (err) => {
+            if (err && !err.message.includes('already exists') && !err.message.includes('no such column') && !err.message.includes('no such table')) {
+              console.warn(`⚠️ Migration [${file}] warning: ${err.message}`);
+            }
+          });
+        }
+        console.log(`✅ Migration loaded: ${file}`);
       }
-      console.log(`✅ Migration loaded: ${file}`);
-    }
 
-    // ALTER TABLE para columnas adicionales (idempotente, compatibilidad)
-    db.run(`ALTER TABLE properties ADD COLUMN latitud REAL`, () => {});
-    db.run(`ALTER TABLE properties ADD COLUMN longitud REAL`, () => {});
-    db.run(`ALTER TABLE properties ADD COLUMN unidad_superficie TEXT DEFAULT 'm²'`, () => {});
-    db.run(`ALTER TABLE properties ADD COLUMN ciudad TEXT`, () => {});
-    db.run(`ALTER TABLE leads ADD COLUMN interes_propiedades TEXT`, () => {});
+      // ALTER TABLE para columnas adicionales (idempotente, compatibilidad)
+      db.run(`ALTER TABLE properties ADD COLUMN latitud REAL`, () => {});
+      db.run(`ALTER TABLE properties ADD COLUMN longitud REAL`, () => {});
+      db.run(`ALTER TABLE properties ADD COLUMN unidad_superficie TEXT DEFAULT 'm²'`, () => {});
+      db.run(`ALTER TABLE properties ADD COLUMN ciudad TEXT`, () => {});
+      db.run(`ALTER TABLE leads ADD COLUMN interes_propiedades TEXT`, () => {});
 
-    console.log('✅ CRM tables and migrations initialized');
+      console.log('✅ CRM tables and migrations initialized');
+
+      // Migrar datos después de que todas las migraciones se completen
+      migrateInteresesData();
+    });
   } catch (err) {
     console.error('❌ Error loading migrations:', err.message);
+  }
+}
+
+// ─ Migración de datos: convertir interes_propiedades JSON a tabla intereses ─
+async function migrateInteresesData() {
+  try {
+    // Verificar si ya hay datos en la tabla intereses
+    const count = await dbGet('SELECT COUNT(*) as cnt FROM intereses');
+    if (count.cnt > 0) {
+      console.log('✅ Intereses table already populated, skipping migration');
+      return;
+    }
+
+    // Obtener todos los leads con interes_propiedades
+    const leads = await dbAll(`
+      SELECT id, client_id, interes_propiedades, status, created_at
+      FROM leads
+      WHERE interes_propiedades IS NOT NULL
+    `);
+
+    let migratedCount = 0;
+    for (const lead of leads) {
+      try {
+        const propIds = JSON.parse(lead.interes_propiedades || '[]');
+        if (!Array.isArray(propIds) || propIds.length === 0) continue;
+
+        for (const propId of propIds) {
+          const id = `interes_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          await dbRun(
+            `INSERT OR IGNORE INTO intereses (id, client_id, lead_id, property_id, estado, fecha_interes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, lead.client_id, lead.id, propId, lead.status || 'nuevo', lead.created_at, new Date().toISOString(), new Date().toISOString()]
+          );
+          migratedCount++;
+        }
+      } catch (e) {
+        console.warn(`⚠️ Error migrating interests for lead ${lead.id}: ${e.message}`);
+      }
+    }
+
+    if (migratedCount > 0) {
+      console.log(`✅ Migrated ${migratedCount} intereses from interes_propiedades`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Error during intereses migration: ${err.message}`);
   }
 }
 
