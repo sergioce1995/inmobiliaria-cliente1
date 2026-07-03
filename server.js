@@ -257,6 +257,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     initializeCRMTables();
     // Asegurar la cuenta de acceso al CRM (sin contraseña hasta el primer acceso)
     ensureAdminUser();
+    // Crear datos de prueba para validar la arquitectura Lead/Interés
+    ensureTestData();
   }
 });
 
@@ -289,6 +291,87 @@ function ensureAdminUser() {
     seed(ADMIN_EMAIL, 'Paula Gutiérrez', 'agente');
     seed(MASTER_ADMIN_EMAIL, 'Administrador', 'admin');
   });
+}
+
+// ─ TEST DATA: Casos de prueba para la arquitectura Lead/Interés ─
+async function ensureTestData() {
+  try {
+    const client_id = 'default-client';
+
+    // Verificar si ya existen datos de prueba
+    const existingCount = await dbGet(
+      'SELECT COUNT(*) as cnt FROM leads WHERE client_id = ? AND nombre IN (?, ?)',
+      [client_id, 'Laura García', 'Juan Pérez']
+    );
+
+    if (existingCount.cnt > 0) {
+      console.log('✅ Test data already exists, skipping');
+      return;
+    }
+
+    console.log('📝 Creating test data for Lead/Interés architecture...');
+
+    // Obtener propiedades para usar como intereses de prueba
+    const props = await dbAll('SELECT id FROM properties WHERE client_id = ? LIMIT 6', [client_id]);
+    if (props.length < 6) {
+      console.warn('⚠️ Not enough properties to create test data (need 6, found ' + props.length + ')');
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    // Lead 1: Laura García (3 intereses en diferentes estados)
+    const lauraId = `lead_laura_${Date.now()}`;
+    await dbRun(
+      `INSERT INTO leads (id, client_id, nombre, apellidos, email, telefono, origin, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [lauraId, client_id, 'Laura', 'García', 'laura@ejemplo.com', '+34 600 111 222', 'web_form', 'contactado', now, now]
+    );
+
+    // Intereses de Laura
+    const interesLabels = [
+      { prop: props[0].id, estado: 'nuevo', notas: 'Interesada en piso moderno' },
+      { prop: props[1].id, estado: 'visita', notas: 'Visita programada para el jueves' },
+      { prop: props[2].id, estado: 'negociacion', notas: 'En proceso de negociación del precio' }
+    ];
+
+    for (const label of interesLabels) {
+      const interesId = `interes_laura_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      await dbRun(
+        `INSERT INTO intereses (id, client_id, lead_id, property_id, estado, notas, fecha_interes, ultima_actividad, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [interesId, client_id, lauraId, label.prop, label.estado, label.notas, now, now, now, now]
+      );
+    }
+
+    // Lead 2: Juan Pérez (3 intereses variados)
+    const juanId = `lead_juan_${Date.now()}`;
+    await dbRun(
+      `INSERT INTO leads (id, client_id, nombre, apellidos, email, telefono, origin, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [juanId, client_id, 'Juan', 'Pérez', 'juan@ejemplo.com', '+34 600 333 444', 'web_form', 'nuevo', now, now]
+    );
+
+    // Intereses de Juan
+    const interesesJuan = [
+      { prop: props[3].id, estado: 'contactado', notas: 'Llamada realizada, interesado' },
+      { prop: props[4].id, estado: 'nuevo', notas: 'Acababa de ver el anuncio' },
+      { prop: props[5].id, estado: 'perdido', notas: 'Cambió de criterios, ya no le interesa' }
+    ];
+
+    for (const label of interesesJuan) {
+      const interesId = `interes_juan_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      await dbRun(
+        `INSERT INTO intereses (id, client_id, lead_id, property_id, estado, notas, fecha_interes, ultima_actividad, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [interesId, client_id, juanId, label.prop, label.estado, label.notas, now, now, now, now]
+      );
+    }
+
+    console.log('✅ Test data created: Laura García (3 intereses) + Juan Pérez (3 intereses)');
+  } catch (err) {
+    console.warn('⚠️ Error creating test data:', err.message);
+  }
 }
 
 // ─ EMAIL: Gmail API (usando Google Service Account) ─
