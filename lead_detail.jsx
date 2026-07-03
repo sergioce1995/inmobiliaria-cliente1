@@ -87,7 +87,7 @@
         {!editing && (telLimpio || lead.email) && (
           <div className="ld-quick-actions">
             {telLimpio && <button className={`ld-qa-btn ld-qa-call${copied === 'tel' ? ' ld-qa-copied' : ''}`} onClick={() => copyValue('tel', lead.tel || telLimpio)}><Icon name="phone" size={16} />{copied === 'tel' ? lead.tel : 'Llamar'}</button>}
-            {telLimpio && <a className="ld-qa-btn ld-qa-wa" href={`https://wa.me/${telLimpio.replace('+', '')}`} target="_blank" rel="noopener noreferrer"><Icon name="send" size={16} />WhatsApp</a>}
+            {telLimpio && <a className="ld-qa-btn ld-qa-wa" href={`https://wa.me/${telLimpio.replace('+', '')}`} target="whatsapp" rel="noopener noreferrer"><Icon name="send" size={16} />WhatsApp</a>}
             {lead.email && <button className={`ld-qa-btn ld-qa-mail${copied === 'email' ? ' ld-qa-copied' : ''}`} onClick={() => copyValue('email', lead.email)}><Icon name="mail" size={16} />{copied === 'email' ? lead.email : 'Email'}</button>}
           </div>
         )}

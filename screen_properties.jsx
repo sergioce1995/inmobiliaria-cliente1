@@ -8,13 +8,16 @@
   function PropertyDetail({ property, leads = [], visits = [], properties = [], onClose, onAction }) {
     const [expandedSection, setExpandedSection] = useState(null);
     const interesados = leads.filter((l) => {
+      if (l.origen === 'captacion') return false; // Excluir captaciones (propietarios)
       try {
         const ips = JSON.parse(l.interes_propiedades || '[]');
         if (Array.isArray(ips)) return ips.some((ip) => (typeof ip === 'object' ? ip.id : ip) === property.id);
       } catch {}
       return false;
     });
-    const sinContactar = interesados.filter((l) => (l.status || l.estado) === 'nuevo');
+    const sinContactar = interesados.filter((l) => l.estado === 'nuevo');
+    const contactadosSinVisita = interesados.filter((l) => l.estado === 'contactado' && !visits.some((v) => v.lead_id === l.id && v.property_id === property.id));
+    const conVisita = interesados.filter((l) => visits.some((v) => v.lead_id === l.id && v.property_id === property.id));
     const propVisits = visits.filter((v) => v.property_id === property.id);
     const compatibles = window.compatibleLeads ? window.compatibleLeads(property, leads, properties) : [];
     const { StatusBadge } = window;
@@ -34,25 +37,32 @@
         </div>
 
         <div className="pd-kpis" style={{ display: 'flex', gap: 8, margin: '16px 0' }}>
-          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('interesados')} title="Ver interesados">
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--blue)' }}>{interesados.length}</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Interesados</div>
-            <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 4, fontWeight: 600 }}>Ver <Icon name="arrowRight" size={10} /></div>
-          </button>
-          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('sinContactar')} title="Ver sin contactar">
-            <div style={{ fontSize: 28, fontWeight: 800, color: sinContactar.length > 0 ? '#e5544b' : 'var(--ink-3)' }}>{sinContactar.length}</div>
+          {/* Sin contactar */}
+          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('sinContactar')} title="Pendientes de contactar">
+            <div style={{ fontSize: 28, fontWeight: 800, color: sinContactar.length > 0 ? '#dc2626' : 'var(--ink-3)' }}>{sinContactar.length}</div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Sin contactar</div>
-            {sinContactar.length > 0 && <div style={{ fontSize: 10, color: '#e5544b', marginTop: 4, fontWeight: 600 }}>Contactar <Icon name="arrowRight" size={10} /></div>}
+            {sinContactar.length > 0 && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4, fontWeight: 600 }}>Contactar <Icon name="arrowRight" size={10} /></div>}
           </button>
-          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('visitas')} title="Ver visitas">
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green)' }}>{propVisits.length}</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Visitas</div>
-            <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 4, fontWeight: 600 }}>Ver <Icon name="arrowRight" size={10} /></div>
+
+          {/* Contactados sin visita */}
+          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('contactadosSinVisita')} title="Contactados sin visita">
+            <div style={{ fontSize: 28, fontWeight: 800, color: contactadosSinVisita.length > 0 ? '#f59e0b' : 'var(--ink-3)' }}>{contactadosSinVisita.length}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Sin visita</div>
+            {contactadosSinVisita.length > 0 && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4, fontWeight: 600 }}>Agendar <Icon name="arrowRight" size={10} /></div>}
           </button>
-          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('compatibles')} title="Ver compatibles">
-            <div style={{ fontSize: 28, fontWeight: 800, color: '#a78bfa' }}>{compatibles.length}</div>
+
+          {/* Con visita */}
+          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('conVisita')} title="Con visita programada">
+            <div style={{ fontSize: 28, fontWeight: 800, color: conVisita.length > 0 ? '#10b981' : 'var(--ink-3)' }}>{conVisita.length}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Con visita</div>
+            {conVisita.length > 0 && <div style={{ fontSize: 10, color: '#10b981', marginTop: 4, fontWeight: 600 }}>Ver <Icon name="arrowRight" size={10} /></div>}
+          </button>
+
+          {/* Compatibles */}
+          <button className="pd-kpi" style={kpiBtn} onClick={() => toggleSection('compatibles')} title="Clientes compatibles">
+            <div style={{ fontSize: 28, fontWeight: 800, color: compatibles.length > 0 ? '#7c3aed' : 'var(--ink-3)' }}>{compatibles.length}</div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2 }}>Compatibles</div>
-            {compatibles.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4, fontWeight: 600 }}>Enviar <Icon name="arrowRight" size={10} /></div>}
+            {compatibles.length > 0 && <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 4, fontWeight: 600 }}>Enviar <Icon name="arrowRight" size={10} /></div>}
           </button>
         </div>
 
@@ -76,16 +86,59 @@
 
           {expandedSection === 'sinContactar' && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: '#e5544b' }}>Sin contactar ({sinContactar.length})</div>
-              {sinContactar.length === 0 ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Todos los interesados ya han sido contactados.</div> : (
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: '#dc2626' }}>Pendientes de contactar ({sinContactar.length})</div>
+              {sinContactar.length === 0 ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Todos los interesados han sido contactados.</div> : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {sinContactar.map((l) => (
                     <button key={l.id} className="pd-lead-row" onClick={() => onAction && onAction({ screen: 'contactos', leadId: l.id })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fef2f2', borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                       <window.Avatar name={l.nombre} color={l.avatar || '#2E75B6'} size={28} />
                       <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{l.nombre}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{l.email} · {l.tel}</div></div>
-                      <Icon name="phone" size={16} style={{ color: '#e5544b' }} />
+                      <Icon name="phone" size={16} style={{ color: '#dc2626' }} />
                     </button>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {expandedSection === 'contactadosSinVisita' && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: '#f59e0b' }}>Contactados sin visita ({contactadosSinVisita.length})</div>
+              {contactadosSinVisita.length === 0 ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Todos los contactados tienen visitas programadas.</div> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {contactadosSinVisita.map((l) => (
+                    <button key={l.id} className="pd-lead-row" onClick={() => onAction && onAction({ screen: 'contactos', leadId: l.id })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#fffbeb', borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                      <window.Avatar name={l.nombre} color={l.avatar || '#2E75B6'} size={28} />
+                      <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{l.nombre}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{l.email} · {l.tel}</div></div>
+                      <Icon name="calendar" size={16} style={{ color: '#f59e0b' }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {expandedSection === 'conVisita' && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: '#10b981' }}>Con visita ({conVisita.length})</div>
+              {conVisita.length === 0 ? <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Sin visitas con este interesado.</div> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {conVisita.map((l) => {
+                    const lvis = visits.filter((v) => v.lead_id === l.id && v.property_id === property.id);
+                    return (
+                      <div key={l.id}>
+                        <button onClick={() => onAction && onAction({ screen: 'contactos', leadId: l.id })} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f0fdf4', borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                          <window.Avatar name={l.nombre} color={l.avatar || '#2E75B6'} size={28} />
+                          <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{l.nombre}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{l.email}</div></div>
+                        </button>
+                        {lvis.map((v) => (
+                          <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px 6px 40px', fontSize: 12, color: 'var(--ink-3)' }}>
+                            <Icon name="check" size={14} style={{ color: '#10b981' }} /> {new Date(v.scheduled_for).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -162,14 +215,9 @@
             <span className="prop-spec"><Icon name="area" size={17} />{p.m2} {p.unidad_superficie || 'm²'}</span>
           </div>
           <div className="prop-foot" onClick={(e) => e.stopPropagation()}>
-            <div className="prop-interesados" title="Interesados en esta propiedad"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: interesados > 0 ? 'var(--blue-50)' : 'transparent', color: interesados > 0 ? 'var(--blue)' : 'var(--ink-3)', borderRadius: 8, padding: '5px 9px', fontSize: 12.5, fontWeight: 600 }}>
-              <Icon name="contacts" size={15} /> {interesados} interesado{interesados === 1 ? '' : 's'}
-            </div>
             <div className="prop-actions">
               <button className="prop-action-btn" onClick={(e) => { e.stopPropagation(); onEdit(p); }} title="Editar"><Icon name="edit" size={15} /></button>
               <button className="prop-action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(p); }} title="Eliminar"><Icon name="trash" size={15} /></button>
-              <button className="prop-action-btn" onClick={(e) => { e.stopPropagation(); onShare(p); }} title="Compartir"><Icon name="share" size={15} /></button>
             </div>
           </div>
         </div>
@@ -620,12 +668,18 @@
   }
 
   // ─── SCREEN ──────────────────────────────────────────────────────
-  function PropertiesScreen({ properties, leads = [], visits = [], toast, onRefresh, onOpenLead }) {
+  function PropertiesScreen({ properties, leads = [], visits = [], toast, onRefresh, onOpenLead, extFilter }) {
     const [share, setShare] = useState(null);
     const [editing, setEditing] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [selectedProperty, setSelectedProperty] = useState(null);
+    const [filterEstado, setFilterEstado] = useState('todos');
+
+    // Aplicar filtro externo si viene
+    React.useEffect(() => {
+      if (extFilter?.estado) setFilterEstado(extFilter.estado);
+    }, [extFilter?.estado]);
 
     const leadsDe = (propId) => leads.filter((l) => {
       let propIds = [];
@@ -665,6 +719,31 @@
           </div>
         </div>
 
+        {/* Selector de estado */}
+        {properties.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            {['todos', 'Disponible', 'Reservado', 'Vendido', 'Alquilado'].map((est) => (
+              <button
+                key={est}
+                onClick={() => setFilterEstado(est)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: filterEstado === est ? '2px solid var(--blue)' : '1px solid var(--border-1)',
+                  background: filterEstado === est ? 'var(--blue-50)' : 'white',
+                  color: filterEstado === est ? 'var(--blue)' : 'var(--ink)',
+                  fontWeight: filterEstado === est ? 600 : 500,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {est === 'todos' ? 'Todos' : est} {est !== 'todos' && `(${properties.filter(p => p.estado === est).length})`}
+              </button>
+            ))}
+          </div>
+        )}
+
         {properties.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🏠</div>
@@ -674,7 +753,7 @@
           </div>
         ) : (
           <div className="prop-grid">
-            {properties.map((p) => (
+            {properties.filter((p) => filterEstado === 'todos' || p.estado === filterEstado).map((p) => (
               <PropCard key={p.id} p={p}
                 interesados={leadsDe(p.id).length}
                 onOpenDetail={(prop) => setSelectedProperty(prop)}

@@ -237,12 +237,17 @@
     );
   }
 
-  function ValoracionesScreen({ valoraciones, setValoraciones, toast, onCreate, onUpdate, onDelete, onConvert }) {
+  function ValoracionesScreen({ valoraciones, setValoraciones, toast, onCreate, onUpdate, onDelete, onConvert, extFilter }) {
     const FILTERS = ['todos', 'pendiente', 'valorada', 'captada', 'descartada'];
     const VS = window.ZADI_DATA.valStatus;
     const [filter, setFilter] = useState('todos');
     const [openId, setOpenId] = useState(null);
     const [showNew, setShowNew] = useState(false);
+
+    // Aplicar filtro externo si viene
+    React.useEffect(() => {
+      if (extFilter?.estado) setFilter(extFilter.estado);
+    }, [extFilter?.estado]);
     const addValoracion = onCreate; // async → devuelve true/false
 
     const counts = FILTERS.reduce((a, f) => {

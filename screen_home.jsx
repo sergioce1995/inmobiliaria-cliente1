@@ -36,9 +36,23 @@
 
     const go = (action) => { if (!action) return; onAction ? onAction(action) : onGo(action.screen); };
 
-    // KPIs principales
-    const kpiList = summary.slice(0, 3);
-    const topRecs = recommendations.slice(0, 5);
+    // KPIs principales (solo 2)
+    const kpiList = summary.slice(0, 2);
+
+    // Máximo 6 recomendaciones, agrupadas por tipo
+    const topRecs = recommendations.slice(0, 6);
+    const recsByType = {};
+    const typeOrder = ['urgente', 'importante', 'seguimiento', 'compatibles'];
+    typeOrder.forEach(t => { recsByType[t] = []; });
+    topRecs.forEach(rec => {
+      const tipo = rec.tipo || 'importante';
+      if (!recsByType[tipo]) recsByType[tipo] = [];
+      recsByType[tipo].push(rec);
+    });
+    const groupedRecs = typeOrder.filter(t => recsByType[t].length > 0).map(t => ({
+      tipo: t,
+      items: recsByType[t]
+    }));
 
     return (
       <div className="page hp-v2">
@@ -48,43 +62,48 @@
           <span className="hp-date">{fecha}</span>
         </div>
 
-        {/* ── KPIs importantes ── */}
+        {/* ── KPIs principales ── */}
         {kpiList.length > 0 && (
           <div className="hp-kpis-grid">
-            {kpiList.map((kpi, i) => (
-              <button key={i} className="kpi-card" onClick={() => go(kpi.action)}>
-                <span className="kpi-val tnum">{kpi.value}</span>
-                <span className="kpi-lbl">{kpi.label}</span>
-              </button>
-            ))}
+            {kpiList.map((kpi, i) => {
+              const iconMap = { phone: 'phone', calendar: 'calendar' };
+              return (
+                <button key={i} className="kpi-card" onClick={() => go(kpi.action)}>
+                  <span className="kpi-icon"><Icon name={iconMap[kpi.icon] || 'zap'} size={26} /></span>
+                  <span className="kpi-val tnum">{kpi.value}</span>
+                  <span className="kpi-lbl">{kpi.label}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* ── Recomendaciones importantes ── */}
-        {topRecs.length > 0 ? (
+        {/* ── Recomendaciones agrupadas por tipo ── */}
+        {groupedRecs.length > 0 ? (
           <div className="hp-recs">
             <h2 className="hp-sec-title">Recomendaciones importantes</h2>
             <div className="hp-recs-list">
-              {topRecs.map((rec, idx) => {
-                const recType = REC_TYPE[rec.tipo] || REC_TYPE.importante;
+              {groupedRecs.map((group) => {
+                const recType = REC_TYPE[group.tipo] || REC_TYPE.importante;
                 return (
-                  <div key={idx} className="rec-card" style={{ borderLeft: `4px solid ${recType.borderColor}`, background: recType.color }}>
-                    <div className="rec-header">
+                  <div key={group.tipo} className="rec-group" style={{ background: recType.color, borderLeftColor: recType.textColor }}>
+                    <div className="rec-group-header">
                       <div className="rec-badge" style={{ background: recType.textColor, color: '#fff' }}>
-                        <Icon name={recType.icon} size={14} />
+                        <Icon name={recType.icon} size={13} />
                         <span>{recType.label}</span>
                       </div>
                     </div>
-                    <h3 className="rec-title" style={{ color: recType.textColor }}>{rec.accion}</h3>
-                    <p className="rec-desc">{rec.motivo}</p>
-                    {rec.impacto && (
-                      <p className="rec-benefit">
-                        <Icon name="sparkle" size={12} /> {rec.impacto}
-                      </p>
-                    )}
-                    <button className="rec-btn" onClick={() => go(rec.action)} style={{ background: recType.textColor, color: '#fff' }}>
-                      {rec.cta} <Icon name="arrowRight" size={14} />
-                    </button>
+                    <div className="rec-group-items">
+                      {group.items.map((rec, idx) => (
+                        <div key={idx} className="rec-item">
+                          <h4 className="rec-item-title" style={{ color: recType.textColor }}>{rec.accion}</h4>
+                          {rec.motivo && <p className="rec-item-desc">{rec.motivo}</p>}
+                          <button className="rec-item-btn" onClick={() => go(rec.action)} style={{ background: recType.textColor, color: '#fff' }}>
+                            {rec.cta} <Icon name="arrowRight" size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}

@@ -105,7 +105,9 @@
       const inBudget = c.presupuesto <= maxBudget;
       const inCity = city === 'todas' || c.ciudad === city;
       const inEstado = estado === 'todos' || c.estado === estado;
-      const inOrigen = !extFilter || !extFilter.origen || c.origen === extFilter.origen;
+      // Filtro de origen: si viene de una recomendación con origen='interesado', excluir captaciones
+      const origenFilter = extFilter && extFilter.origen ? extFilter.origen : 'todos';
+      const inOrigen = origenFilter === 'todos' || c.origen === origenFilter;
       const inTipo = tipo === 'todos' || (tipo === 'propietario' ? c.origen === 'captacion' : c.origen !== 'captacion');
       const lvl = (window.leadScore ? window.leadScore(c, visits) : { level: 'bajo' }).level;
       const inQuality = quality === 'todos' || lvl === quality;

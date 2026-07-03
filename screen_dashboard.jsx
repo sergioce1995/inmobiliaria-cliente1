@@ -5,11 +5,24 @@
   const fmtEur = window.fmtEur;
 
   // ── KPI CARD ──────────────────────────────────────────────────────────
-  function KpiCard({ k }) {
-    return (
-      <div className="kpi">
+  function KpiCard({ k, onClick }) {
+    const commonContent = () => (
+      <>
         <div className="k-label">{k.label}</div>
         <div className="k-val tnum" style={{ marginTop: 10 }}>{k.value}</div>
+      </>
+    );
+
+    if (onClick) {
+      return (
+        <button onClick={onClick} className="kpi" style={{ cursor: 'pointer', border: 'none', background: 'transparent', padding: 0, width: '100%', textAlign: 'left' }}>
+          {commonContent()}
+        </button>
+      );
+    }
+    return (
+      <div className="kpi">
+        {commonContent()}
       </div>
     );
   }
@@ -136,11 +149,9 @@
     const soldProps = useMemo(() => properties.filter(p => p.estado === 'Vendido'), [properties]);
     const rentedProps = useMemo(() => properties.filter(p => p.estado === 'Alquilado'), [properties]);
 
-    const avgCloseDays = useMemo(() => {
-      if (!analytics.operaciones?.raw?.length) return '—';
-      const avg = Math.round(analytics.operaciones.raw.reduce((s, o) => s + (o.dias || 0), 0) / analytics.operaciones.raw.length);
-      return avg > 0 ? `${avg}d` : '—';
-    }, [analytics.operaciones]);
+    const captacionesPendientes = useMemo(() => {
+      return analytics.captacionesPendientes || 0;
+    }, [analytics.captacionesPendientes]);
 
     // Qué estás vendiendo: por tipo
     const propsByType = useMemo(() => {
@@ -179,10 +190,10 @@
 
         {/* Resumen del negocio — 4 KPIs clave */}
         <div className="kpi-row">
-          <KpiCard k={{ label: 'Propiedades activas', value: activeProps.length }} />
-          <KpiCard k={{ label: 'Propiedades vendidas', value: soldProps.length }} />
-          <KpiCard k={{ label: 'Propiedades alquiladas', value: rentedProps.length }} />
-          <KpiCard k={{ label: 'Tiempo medio de cierre', value: avgCloseDays }} />
+          <KpiCard k={{ label: 'Propiedades activas', value: activeProps.length }} onClick={() => onAction && onAction({ screen: 'propiedades', estado: 'Disponible' })} />
+          <KpiCard k={{ label: 'Captaciones pendientes', value: captacionesPendientes }} onClick={() => onAction && onAction({ screen: 'valoraciones', estado: 'pendiente' })} />
+          <KpiCard k={{ label: 'Propiedades vendidas', value: soldProps.length }} onClick={() => onAction && onAction({ screen: 'propiedades', estado: 'Vendido' })} />
+          <KpiCard k={{ label: 'Propiedades alquiladas', value: rentedProps.length }} onClick={() => onAction && onAction({ screen: 'propiedades', estado: 'Alquilado' })} />
         </div>
 
         {/* Estado de los interesados */}

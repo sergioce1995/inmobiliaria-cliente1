@@ -675,6 +675,7 @@
       return {
         ...base,
         kpis, funnel, sources, insights,
+        captacionesPendientes: valPending,
         operaciones: {
           ...base.operaciones,
           zonas,
@@ -710,7 +711,14 @@
 
       // Estadísticas de interés por propiedad (interesados / sin contactar / visitas / compatibles)
       const propStats = properties.map((p) => {
-        const interesados = leads.filter((l) => l.origen !== 'captacion' && Array.isArray(l.propiedades) && l.propiedades.includes(p.id));
+        const interesados = leads.filter((l) => {
+          if (l.origen === 'captacion') return false; // Excluir captaciones
+          try {
+            const ips = JSON.parse(l.interes_propiedades || '[]');
+            if (Array.isArray(ips)) return ips.some((ip) => (typeof ip === 'object' ? ip.id : ip) === p.id);
+          } catch {}
+          return false;
+        });
         const sinContactar = interesados.filter((l) => l.estado === 'nuevo');
         const vis = progVisits.filter((v) => v.property_id === p.id).length;
         const compat = window.compatibleLeads ? window.compatibleLeads(p, leads, properties) : [];
@@ -726,71 +734,112 @@
         return dias >= 3 ? { l, dias } : null;
       }).filter(Boolean).sort((a, b) => b.dias - a.dias);
 
+      // Solo 2 KPIs principales simplificados
       const summary = [
-        { label: 'Interesados nuevos', value: nuevos.length, action: { screen: 'contactos', estado: 'nuevo' } },
-        { label: 'Visitas hoy', value: visitasHoy.length, action: { screen: 'calendario' } },
-        { label: 'Seguimientos', value: stale.length, action: { screen: 'contactos', estado: 'contactado' } },
-        { label: 'Captaciones pendientes', value: captPend.length, action: { screen: 'valoraciones' } },
-        { label: 'Propiedades activas', value: propsActivas.length, action: { screen: 'propiedades' } },
+        { label: 'Pendientes de contactar', value: nuevos.length, action: { screen: 'contactos', estado: 'nuevo' }, icon: 'phone' },
+        { label: 'Visitas hoy', value: visitasHoy.length, action: { screen: 'calendario' }, icon: 'calendar' },
       ];
 
       // ── Recomendaciones "Qué hacer hoy" (Acción · Motivo · Beneficio · Botón) ──
       const recs = [];
       const plural = (n) => n === 1 ? '' : 's';
 
-      // 🔴 Contactar interesados sin contactar (propiedad con más sin contactar)
-      const topSin = propStats.filter((s) => s.sinContactar > 0).sort((a, b) => b.sinContactar - a.sinContactar)[0];
-      if (topSin) recs.push({
-        tipo: 'urgente', icon: 'phone', w: 100,
-        accion: `Contacta a ${topSin.sinContactar} interesado${plural(topSin.sinContactar)}`,
-        motivo: `«${topSin.p.titulo}» tiene ${topSin.sinContactar} interesado${plural(topSin.sinContactar)} registrado${plural(topSin.sinContactar)} que todavía no has contactado.`,
-        impacto: 'Alta probabilidad de convertir en visita. Acción de menos de 5 minutos.',
-        cta: 'Contactar ahora', action: { screen: 'contactos', estado: 'nuevo', propertyId: topSin.p.id },
-      });
+      // Sistema inteligente de recomendaciones dinámicas — máx 5
+      // Mezcla recomendaciones específicas (una propiedad) con generales (múltiples propiedades)
 
-      // 🔵 Seguimiento de una visita pasada sin cerrar
-      if (followUps.length) {
-        const f = followUps[0];
+      // 🔴 Interesados sin contactar (TODOS: interesados + captaciones)
+      const todosSinContactar = leads.filter((l) => l.estado === 'nuevo');
+      const captacionesSinContactar = todosSinContactar.filter((l) => l.origen === 'captacion');
+      const interesadosSinContactar = todosSinContactar.filter((l) => l.origen !== 'captacion');
+
+      if (todosSinContactar.length > 0) {
+        const totalSin = todosSinContactar.length;
         recs.push({
-          tipo: 'seguimiento', icon: 'clock', w: 85,
-          accion: `Llama a ${f.l.nombre}`,
-          motivo: `${f.l.nombre} realizó una visita hace ${f.dias} día${plural(f.dias)} y todavía no hay seguimiento.`,
-          impacto: `Lleva${f.dias > 1 ? 'n' : ''} esperando ${f.dias} días. Un seguimiento a tiempo evita perder la operación.`,
-          cta: 'Ver interesado', action: { screen: 'contactos', leadId: f.l.id },
+          tipo: 'urgente', icon: 'phone', w: 100,  // Prioridad 1
+          accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en propiedad y ${captacionesSinContactar.length} posible${plural(captacionesSinContactar.length)} captacion${captacionesSinContactar.length === 1 ? '' : 'es'}`,
+          motivo: `Todos necesitan contacto inmediato.`,
+          cta: 'Ver', action: { screen: 'contactos', estado: 'nuevo' },
         });
       }
 
-      // 🟠 Programar visitas: propiedad con mucho interés y pocas visitas
-      const topVisita = propStats.filter((s) => s.interesados >= 2 && s.vis <= 1 && s.interesados > s.vis).sort((a, b) => b.interesados - a.interesados)[0];
-      if (topVisita) recs.push({
-        tipo: 'importante', icon: 'calendar', w: 75,
-        accion: `Programa visitas de «${topVisita.p.titulo}»`,
-        motivo: `Tiene ${topVisita.interesados} interesados y ${topVisita.vis === 0 ? 'ninguna visita' : 'solo 1 visita'} programada.`,
-        impacto: 'Cada visita acerca la operación al cierre.',
-        cta: 'Abrir agenda', action: { screen: 'calendario', propertyId: topVisita.p.id },
-      });
+      // 🔵 Visitas programadas para hoy
+      if (visitasHoy.length > 0) {
+        recs.push({
+          tipo: 'importante', icon: 'calendar', w: 95,  // Prioridad 2
+          accion: `Tienes ${visitasHoy.length} visita${plural(visitasHoy.length)} hoy`,
+          motivo: visitasHoy.slice(0, 3).map((v) => {
+            const l = leads.find((x) => x.id === v.lead_id);
+            const h = new Date(v.scheduled_for).getHours();
+            const m = new Date(v.scheduled_for).getMinutes();
+            return `${l?.nombre || 'Interesado'} a las ${h}:${m < 10 ? '0' : ''}${m}`;
+          }).join(' • '),
+          cta: 'Ver agenda', action: { screen: 'calendario' },
+        });
+      }
 
-      // 🟢 Enviar propiedad a clientes compatibles (estimación)
-      const topCompat = propStats.filter((s) => s.compat > 0).sort((a, b) => b.compat - a.compat)[0];
-      if (topCompat) recs.push({
-        tipo: 'compatibles', icon: 'send', w: 60,
-        accion: `Envía «${topCompat.p.titulo}» a ${topCompat.compat} cliente${plural(topCompat.compat)}`,
-        motivo: `${topCompat.compat} cliente${plural(topCompat.compat)} de tu base de datos encaja${topCompat.compat === 1 ? '' : 'n'} con el perfil de esta vivienda y todavía no la conoce${topCompat.compat === 1 ? '' : 'n'} (estimado).`,
-        impacto: 'Puedes generar nuevas visitas sin captar nuevos interesados.',
-        cta: 'Ver compatibles', action: { screen: 'propiedades' },
-      });
+      // Recomendaciones inteligentes por estado de lead
+      const enNegociacion = leads.filter((l) => l.estado === 'negociacion');
+      const enVisita = leads.filter((l) => l.estado === 'visita');
 
-      // 🟠 Captaciones pendientes de valorar
-      if (captPend.length) recs.push({
-        tipo: 'importante', icon: 'tag', w: 40,
-        accion: `Valora ${captPend.length} captación${captPend.length > 1 ? 'es' : ''}`,
-        motivo: `Tienes ${captPend.length} captación${captPend.length > 1 ? 'es' : ''} pendiente${plural(captPend.length)} de valorar.`,
-        impacto: 'Captar a tiempo te asegura nuevos inmuebles.',
-        cta: 'Ver captación', action: { screen: 'valoraciones' },
-      });
+      if (enNegociacion.length > 0) {
+        recs.push({
+          tipo: 'importante', icon: 'handshake', w: 82,  // Prioridad 3.5
+          accion: `Tienes ${enNegociacion.length} contacto${plural(enNegociacion.length)} en negociación`,
+          motivo: `Contactalos para cerrar la oferta.`,
+          cta: 'Ver', action: { screen: 'contactos', estado: 'negociacion' },
+        });
+      } else if (enVisita.length > 0) {
+        recs.push({
+          tipo: 'seguimiento', icon: 'clock', w: 80,  // Prioridad 4
+          accion: `Tienes ${enVisita.length} contacto${plural(enVisita.length)} en visita`,
+          motivo: `Haz seguimiento para pasar a negociación.`,
+          cta: 'Ver', action: { screen: 'contactos', estado: 'visita' },
+        });
+      } else if (followUps.length > 0) {
+        recs.push({
+          tipo: 'seguimiento', icon: 'clock', w: 80,  // Prioridad 4
+          accion: `Tienes ${followUps.length} contacto${plural(followUps.length)} sin seguimiento`,
+          motivo: `Realizaron una visita hace días sin cierre.`,
+          cta: 'Ver', action: { screen: 'contactos' },
+        });
+      }
 
+      // 🟢 Propiedades con interesados sin visita programada (general)
+      const propsVisitasPendientes = propStats.filter((s) => s.interesados >= 2 && s.vis === 0);
+      if (propsVisitasPendientes.length > 0) {
+        recs.push({
+          tipo: 'importante', icon: 'calendar', w: 90,  // Prioridad 3
+          accion: `Programa visitas: ${propsVisitasPendientes.length} propiedad${plural(propsVisitasPendientes.length)} con oportunidades`,
+          motivo: propsVisitasPendientes.slice(0, 3).map((p) => `${p.p.titulo} (${p.interesados})`).join(' • '),
+          cta: 'Ver propiedades', action: { screen: 'propiedades' },
+        });
+      }
+
+      // Clientes compatibles (si hay muchos)
+      const propsConCompat = propStats.filter((s) => s.compat > 2);
+      if (propsConCompat.length > 0) {
+        const totalCompat = propsConCompat.reduce((s, p) => s + p.compat, 0);
+        recs.push({
+          tipo: 'compatibles', icon: 'send', w: 70,  // Prioridad 5
+          accion: `${totalCompat} cliente${plural(totalCompat)} compatibles sin contactar`,
+          motivo: propsConCompat.slice(0, 3).map((p) => `${p.p.titulo} (${p.compat})`).join(' • '),
+          cta: 'Enviar', action: { screen: 'propiedades' },
+        });
+      }
+
+      // 🏠 Nuevas captaciones pendientes
+      if (captPend.length > 0) {
+        recs.push({
+          tipo: 'importante', icon: 'tag', w: 65,
+          accion: `${captPend.length} nueva captación${plural(captPend.length)} pendiente${plural(captPend.length)}`,
+          motivo: `Propiedad${plural(captPend.length)} para valorar.`,
+          cta: 'Ver', action: { screen: 'valoraciones' },
+        });
+      }
+
+      // Ordenar por prioridad y tomar máx 5
       recs.sort((a, b) => b.w - a.w);
-      const recommendations = recs.slice(0, 6);
+      const recommendations = recs.slice(0, 5);
 
       const activity = [];
       leads.forEach((l) => {
@@ -849,9 +898,9 @@
           <div className="content">
             {screen === 'inicio' && <HomeScreen homeData={homeData} onGo={goTo} onAction={goWithFilter} user={user} />}
             {screen === 'contactos' && <ContactsScreen leads={leads} setLeads={setLeads} visits={visits} properties={properties} extFilter={extFilter} clearExtFilter={() => setExtFilter(null)} onCreateLead={createLead} onUpdateLead={updateLead} onDeleteLead={deleteLead} onSaveVisit={saveVisit} onDeleteVisit={deleteVisit} />}
-            {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goWithFilter({ screen: 'contactos', leadId })} />}
+            {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goWithFilter({ screen: 'contactos', leadId })} extFilter={extFilter} />}
             {screen === 'calendario' && <CalendarScreen visits={visits} leads={leads} properties={properties} onCreateVisit={createVisit} onMoveVisit={moveVisit} onDeleteVisit={deleteVisit} onSaveVisit={saveVisit} toast={pushToast} />}
-            {screen === 'valoraciones' && <ValoracionesScreen valoraciones={valoraciones} setValoraciones={setValoraciones} toast={pushToast} onCreate={createCaptacion} onUpdate={updateCaptacion} onDelete={deleteCaptacion} onConvert={convertCaptacion} />}
+            {screen === 'valoraciones' && <ValoracionesScreen valoraciones={valoraciones} setValoraciones={setValoraciones} toast={pushToast} onCreate={createCaptacion} onUpdate={updateCaptacion} onDelete={deleteCaptacion} onConvert={convertCaptacion} extFilter={extFilter} />}
             {screen === 'dashboard' && <DashboardScreen analytics={dashboardAnalytics} properties={properties} onAction={goWithFilter} />}
             {screen === 'notificaciones' && <NotificationsScreen notifications={notifications} toast={pushToast} />}
             {screen === 'uikit' && <UIKitScreen />}
