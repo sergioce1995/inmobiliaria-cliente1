@@ -5,8 +5,8 @@
   const fmtEur = window.fmtEur;
 
   // PropertyDetail inline
-  function PropertyDetail({ property, leads = [], visits = [], properties = [], onClose, onAction }) {
-    const [expandedSection, setExpandedSection] = useState(null);
+  function PropertyDetail({ property, leads = [], visits = [], properties = [], onClose, onAction, initialTab = null }) {
+    const [expandedSection, setExpandedSection] = useState(initialTab || null);
     const interesados = leads.filter((l) => {
       if (l.origen === 'captacion') return false; // Excluir captaciones (propietarios)
       try {
@@ -676,10 +676,13 @@
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [filterEstado, setFilterEstado] = useState('todos');
 
-    // Aplicar filtro externo si viene
+    // Aplicar filtro externo si viene - abre una propiedad específica desde contexto
     React.useEffect(() => {
+      if (extFilter?._propertyDetailContext && extFilter._selectedProperty) {
+        setSelectedProperty(extFilter._selectedProperty);
+      }
       if (extFilter?.estado) setFilterEstado(extFilter.estado);
-    }, [extFilter?.estado]);
+    }, [extFilter?._propertyDetailContext, extFilter?._selectedProperty, extFilter?.estado]);
 
     const leadsDe = (propId) => leads.filter((l) => {
       let propIds = [];
@@ -792,7 +795,8 @@
                 visits={visits}
                 properties={properties}
                 onClose={() => setSelectedProperty(null)}
-                onAction={(action) => { setSelectedProperty(null); onOpenLead && action.leadId ? onOpenLead(action.leadId) : null; }} />
+                onAction={(action) => { setSelectedProperty(null); onOpenLead && action.leadId ? onOpenLead(action.leadId) : null; }}
+                initialTab={extFilter?._propertyDetailContext ? extFilter.activeTab : null} />
             </div>
           </div>
         )}

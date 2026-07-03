@@ -247,6 +247,24 @@
           }),
         });
         await loadVisits();
+
+        if (lead && property_id) {
+          // 🔧 Auto-add property to lead's interes_propiedades if not already present
+          const currentProps = lead.interes_propiedades ? JSON.parse(lead.interes_propiedades) : [];
+          const propIds = currentProps.map(p => typeof p === 'object' ? p.id : p);
+          if (!propIds.includes(property_id)) {
+            const updatedProps = [...currentProps, { id: property_id }];
+            await fetch(`/api/crm/leads/${lead_id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                client_id: 'default-client',
+                interes_propiedades: JSON.stringify(updatedProps),
+              }),
+            });
+          }
+        }
+
         if (lead && (lead.estado === 'nuevo' || lead.estado === 'contactado')) {
           await fetch(`/api/crm/leads/${lead_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: 'default-client', status: 'visita' }) });
           await loadLeads();
@@ -599,6 +617,49 @@
     };
     const goTo = (s) => { setExtFilter(null); setScreen(s); };
 
+    // ── Navegación contextualizada para recomendaciones ──
+    // Cada recomendación abre exactamente el contexto donde se resuelve el problema
+    const openPropertyDetail = (propertyId, activeTab = null, leadIds = []) => {
+      // Find the property and store it so PropertiesScreen can open it directly
+      const prop = properties.find(p => p.id === propertyId);
+      if (prop) {
+        setScreen('propiedades');
+        setExtFilter({
+          _propertyDetailContext: true,
+          propertyId,
+          activeTab,
+          leadIds,
+          _selectedProperty: prop, // Pass the property object directly
+        });
+      }
+    };
+
+    const openLeadsFiltered = (estado, leadIds = null) => {
+      setExtFilter(leadIds ? { estado, leadIds } : { estado });
+      setScreen('contactos');
+    };
+
+    const handleContextAction = (action) => {
+      if (!action || !action._contextType) {
+        // Fallback para acciones antiguas
+        goWithFilter(action);
+        return;
+      }
+
+      const type = action._contextType;
+      if (type === 'propertyDetail') {
+        openPropertyDetail(action.propertyId, action.activeTab, action.leadIds);
+      } else if (type === 'leadsFiltered') {
+        openLeadsFiltered(action.estado, action.leadIds);
+      } else if (type === 'calendar') {
+        goTo('calendario');
+      } else if (type === 'valoraciones') {
+        goTo('valoraciones');
+      } else if (type === 'properties') {
+        goTo('propiedades');
+      }
+    };
+
     // apply tweaks → CSS vars
     useEffect(() => {
       const r = document.documentElement.style;
@@ -795,11 +856,16 @@
 
       if (todosSinContactar.length > 0 || captacionesPendientesNoConvertidas > 0) {
         const totalSin = nuevoIntereses; // Usa el total ya calculado arriba
+        // Extraer IDs únicos de leads sin contactar (combinando interesados + captaciones)
+        const leadIdsSinContactar = Array.from(new Set([
+          ...interesadosSinContactar.map(i => i.lead_id),
+          ...captacionesSinContactar.map(i => i.lead_id)
+        ]));
         recs.push({
           tipo: 'urgente', icon: 'phone', w: 100,  // Prioridad 1
           accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en comprar o alquilar y ${totalCaptaciones} posible${plural(totalCaptaciones)} captacion${totalCaptaciones === 1 ? '' : 'es'}`,
           motivo: `Todos necesitan contacto inmediato.`,
-          cta: 'Ver', action: { screen: 'contactos', estado: 'nuevo' },
+          cta: 'Ver', action: window.contextNavigation.leadsFiltered('nuevo', leadIdsSinContactar),
         });
       }
 
@@ -850,11 +916,14 @@
       // 🟢 Propiedades con interesados sin visita programada (general)
       const propsVisitasPendientes = propStats.filter((s) => s.interesados >= 2 && s.vis === 0);
       if (propsVisitasPendientes.length > 0) {
+        // Abrir la primera propiedad con el tab sinContactar active para que vea quién contactar
+        const firstPropWithIssues = propsVisitasPendientes[0];
         recs.push({
           tipo: 'importante', icon: 'calendar', w: 90,  // Prioridad 3
           accion: `Programa visitas: ${propsVisitasPendientes.length} propiedad${plural(propsVisitasPendientes.length)} con oportunidades`,
           motivo: propsVisitasPendientes.slice(0, 3).map((p) => `${p.p.titulo}`).join(' • '),
-          cta: 'Ver propiedades', action: { screen: 'propiedades' },
+          cta: 'Ver propiedades',
+          action: firstPropWithIssues ? window.contextNavigation.propertyDetail(firstPropWithIssues.p.id, 'sinContactar') : { screen: 'propiedades' },
         });
       }
 
@@ -939,7 +1008,7 @@
         <div className="main">
           <Topbar title={title} notifications={notifications} onLogout={logout} onGo={goTo} user={user} onMenuClick={() => setMobileNavOpen((v) => !v)} />
           <div className="content">
-            {screen === 'inicio' && <HomeScreen homeData={homeData} onGo={goTo} onAction={goWithFilter} user={user} />}
+            {screen === 'inicio' && <HomeScreen homeData={homeData} onGo={goTo} onAction={handleContextAction} user={user} />}
             {screen === 'contactos' && <ContactsScreen leads={leads} setLeads={setLeads} visits={visits} properties={properties} extFilter={extFilter} clearExtFilter={() => setExtFilter(null)} onCreateLead={createLead} onUpdateLead={updateLead} onDeleteLead={deleteLead} onSaveVisit={saveVisit} onDeleteVisit={deleteVisit} />}
             {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goWithFilter({ screen: 'contactos', leadId })} extFilter={extFilter} />}
             {screen === 'calendario' && <CalendarScreen visits={visits} leads={leads} properties={properties} onCreateVisit={createVisit} onMoveVisit={moveVisit} onDeleteVisit={deleteVisit} onSaveVisit={saveVisit} toast={pushToast} />}

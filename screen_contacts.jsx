@@ -91,6 +91,7 @@
     }, [extFilter]);
 
     const extPropertyId = extFilter && extFilter.propertyId ? extFilter.propertyId : null;
+    const extLeadIds = extFilter && extFilter.leadIds ? extFilter.leadIds : null;
 
     const cities = ['todas', ...Array.from(new Set(leads.map((c) => c.ciudad)))];
 
@@ -120,7 +121,8 @@
       const lvl = (window.leadScore ? window.leadScore(c, visits) : { level: 'bajo' }).level;
       const inQuality = quality === 'todos' || lvl === quality;
       const inProperty = !extPropertyId || (Array.isArray(c.propiedades) && c.propiedades.includes(extPropertyId));
-      return hit && inBudget && inCity && inEstado && inOrigen && inTipo && inQuality && inProperty;
+      const inLeadIds = !extLeadIds || extLeadIds.includes(c.id);
+      return hit && inBudget && inCity && inEstado && inOrigen && inTipo && inQuality && inProperty && inLeadIds;
     });
     rows = [...rows].sort((a, b) => {
       if (sort.key === 'interes') {
