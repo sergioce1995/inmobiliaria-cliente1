@@ -734,13 +734,17 @@
 
       // NUEVA ARQUITECTURA: acceder a intereses
       const allIntereses = window.ZADI_DATA.intereses || [];
-
-      const nuevos = leads.filter((l) => l.estado === 'nuevo');
       const progVisits = visits.filter((v) => v.status === 'programada');
       const visitasHoy = progVisits.filter((v) => { const d = new Date(v.scheduled_for); return d >= startToday && d < endToday; });
       const visitasSemana = progVisits.filter((v) => { const d = new Date(v.scheduled_for); return d >= lunes && d < domingo; });
       const captPend = valoraciones.filter((v) => v.estado === 'pendiente');
       const propsActivas = properties.filter((p) => p.estado === 'Disponible');
+
+      // Contar "sin contactar" sincronizando con recomendaciones (intereses + captaciones pendientes)
+      const interesadosSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen !== 'captacion'));
+      const captacionesSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen === 'captacion'));
+      const captacionesPendientesNoConvertidas = captPend.length;
+      const nuevoIntereses = interesadosSinContactar.length + captacionesSinContactar.length + captacionesPendientesNoConvertidas;
 
       // Seguimientos olvidados: contactado/visita sin actividad > 5 días (más antiguos primero)
       const stale = leads
@@ -773,7 +777,7 @@
 
       // Solo 2 KPIs principales simplificados
       const summary = [
-        { label: 'Pendientes de contactar', value: nuevos.length, action: { screen: 'contactos', estado: 'nuevo' }, icon: 'phone' },
+        { label: 'Pendientes de contactar', value: nuevoIntereses, action: { screen: 'contactos', estado: 'nuevo' }, icon: 'phone' },
         { label: 'Visitas hoy', value: visitasHoy.length, action: { screen: 'calendario' }, icon: 'calendar' },
       ];
 
@@ -785,14 +789,12 @@
       // Mezcla recomendaciones específicas (una propiedad) con generales (múltiples propiedades)
 
       // 🔴 Interesados sin contactar (NUEVA ARQUITECTURA: contar por intereses)
-      const interesadosSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen !== 'captacion'));
-      const captacionesSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen === 'captacion'));
-      const captacionesPendientesNoConvertidas = captPend.length; // Captaciones sin convertir a leads aún
+      // Los valores ya están calculados arriba (interesadosSinContactar, captacionesSinContactar, captacionesPendientesNoConvertidas)
       const totalCaptaciones = captacionesSinContactar.length + captacionesPendientesNoConvertidas;
       const todosSinContactar = [...interesadosSinContactar, ...captacionesSinContactar];
 
       if (todosSinContactar.length > 0 || captacionesPendientesNoConvertidas > 0) {
-        const totalSin = todosSinContactar.length + captacionesPendientesNoConvertidas;
+        const totalSin = nuevoIntereses; // Usa el total ya calculado arriba
         recs.push({
           tipo: 'urgente', icon: 'phone', w: 100,  // Prioridad 1
           accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en comprar o alquilar y ${totalCaptaciones} posible${plural(totalCaptaciones)} captacion${totalCaptaciones === 1 ? '' : 'es'}`,
