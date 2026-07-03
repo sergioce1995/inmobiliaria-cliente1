@@ -25,6 +25,7 @@
     const [visitVal, setVisitVal] = useState(toLocalInput(visit && visit.scheduled_for));
     const [editing, setEditing] = useState(false);
     const [confirmDel, setConfirmDel] = useState(false);
+    const [interesChanges, setInteresChanges] = useState({}); // Rastrear cambios de estado de intereses
     const propIds = (() => {
       if (lead.propiedades && Array.isArray(lead.propiedades) && lead.propiedades.length) return lead.propiedades;
       try { const a = JSON.parse(lead.interes_propiedades || '[]'); if (Array.isArray(a) && a.length) return a; } catch {}
@@ -44,6 +45,7 @@
         return lead.propiedad ? [lead.propiedad] : (lead.source_property_id ? [lead.source_property_id] : []);
       })();
       setEdit({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '', propiedades: propIds || [] });
+      setInteresChanges({});
       setEditing(false); setConfirmDel(false);
     }, [lead.id]);
     const setE = (k) => (e) => setEdit((f) => ({ ...f, [k]: e.target.value }));
@@ -60,7 +62,22 @@
         const toSave = { ...edit };
         if (edit.propiedades && edit.propiedades.length > 0) toSave.interes_propiedades = JSON.stringify(edit.propiedades);
         const ok = await onUpdateLead(lead.id, toSave);
-        if (ok) setEditing(false);
+        if (ok) {
+          // Guardar cambios de estado de intereses
+          for (const [interesId, nuevoEstado] of Object.entries(interesChanges)) {
+            try {
+              await fetch(`/api/crm/intereses/${interesId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: nuevoEstado })
+              });
+            } catch (err) {
+              console.error('Error actualizando interés:', err);
+            }
+          }
+          setInteresChanges({});
+          setEditing(false);
+        }
       }
     };
     const doDelete = async () => {
@@ -90,14 +107,13 @@
           <div className="dh-info">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, rowGap: 6, flexWrap: 'wrap' }}>
               <h2 className="t-h2" style={{ margin: 0 }}>{lead.nombre}</h2>
-              <StatusBadge status={lead.estado} />
               {(() => {
                 const lvl = (window.leadScore ? window.leadScore(lead, visit ? [visit] : []) : { level: 'bajo' }).level;
                 const q = (window.LEAD_QUALITY || {})[lvl] || { label: '' };
                 return <span className="lead-q-chip" title={q.label}><span className={`lead-q ${lvl}`} />{q.label}</span>;
               })()}
             </div>
-            <div style={{ color: 'var(--ink-3)', fontSize: 13.5, marginTop: 3 }}>Interesado desde {lead.fecha}</div>
+            <div style={{ color: 'var(--ink-3)', fontSize: 13.5, marginTop: 3 }}>Desde {lead.fecha} · {origenLabel}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {onUpdateLead && !editing && <Button variant="secondary" size="sm" icon="edit" onClick={() => setEditing(true)}>Editar</Button>}
@@ -140,13 +156,17 @@
                 <div style={{ marginBottom: 16, padding: '12px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--line)' }}>
                   <span className="t-eyebrow" style={{ display: 'block', marginBottom: 10 }}>Propiedades de interés</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {properties.map((prop) => (
-                      <label key={prop.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-                        <input type="checkbox" checked={(edit.propiedades || []).includes(prop.id)} onChange={() => toggleProp(prop.id)} style={{ cursor: 'pointer' }} />
-                        <span style={{ flex: 1 }}>{prop.titulo}</span>
-                        {prop.ciudad && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{prop.ciudad}</span>}
-                      </label>
-                    ))}
+                    {/* Agregar nuevas propiedades */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 8 }}>Agregar propiedades:</div>
+                      {properties.map((prop) => (
+                        <label key={prop.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, marginBottom: 6 }}>
+                          <input type="checkbox" checked={(edit.propiedades || []).includes(prop.id)} onChange={() => toggleProp(prop.id)} style={{ cursor: 'pointer' }} />
+                          <span style={{ flex: 1 }}>{prop.titulo}</span>
+                          {prop.ciudad && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{prop.ciudad}</span>}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -169,17 +189,71 @@
             <div className="dfield"><span className="k">Teléfono</span><span className="v"><Icon name="phone" size={15} />{lead.tel}</span></div>
             <div className="dfield"><span className="k">Origen</span><span className="v"><Icon name="share" size={15} />{origenLabel}</span></div>
             <div className="dfield" style={{ gridColumn: '1 / -1' }}>
-              <span className="k">{esPropietario ? 'Quiere captar' : `Propiedades de interés${propNames.length > 1 ? ` (${propNames.length})` : ''}`}</span>
+              <span className="k">Propiedades de interés{(lead.intereses || []).length > 0 ? ` (${(lead.intereses || []).length})` : ''}</span>
               {esPropietario ? (
                 <span className="v"><Icon name="properties" size={15} />Vender / alquilar su propiedad</span>
-              ) : propNames.length === 0 ? (
+              ) : (lead.intereses || []).length === 0 ? (
                 <span className="v"><Icon name="properties" size={15} />—</span>
               ) : (
-                <span className="v" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {propNames.map((n, i) => (
-                    <span key={i} className="badge" style={{ background: 'var(--blue-50)', color: 'var(--blue)' }}><Icon name="properties" size={12} /> {n}</span>
-                  ))}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(lead.intereses || []).map((interes) => {
+                    const prop = properties.find((p) => p.id === interes.property_id);
+                    return (
+                      <div key={interes.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 500 }}>{prop ? prop.titulo : `Propiedad ${interes.property_id}`}</div>
+                          {prop && prop.ciudad && <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{prop.ciudad}</div>}
+                        </div>
+                        <select
+                          value={interesChanges[interes.id] !== undefined ? interesChanges[interes.id] : interes.estado}
+                          onChange={async (e) => {
+                            const nuevoEstado = e.target.value;
+                            // Actualizar estado local inmediatamente para UI
+                            setInteresChanges((c) => ({ ...c, [interes.id]: nuevoEstado }));
+                            // Actualizar el objeto interes en el lead localmente
+                            const interesActualizado = { ...interes, estado: nuevoEstado };
+                            const nuevosIntereses = (lead.intereses || []).map(i => i.id === interes.id ? interesActualizado : i);
+                            // Actualizar en memoria el lead
+                            lead.intereses = nuevosIntereses;
+
+                            // Guardar en la BD
+                            try {
+                              const res = await fetch(`/api/crm/intereses/${interes.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ estado: nuevoEstado })
+                              });
+                              if (res.ok) {
+                                console.log('✅ Estado de interés actualizado y guardado en BD');
+                              } else {
+                                console.error('❌ Error al guardar en BD:', res.status);
+                                // Revertir cambio si falla
+                                setInteresChanges((c) => {
+                                  const { [interes.id]: _, ...rest } = c;
+                                  return rest;
+                                });
+                              }
+                            } catch (err) {
+                              console.error('❌ Error al actualizar estado:', err);
+                              // Revertir cambio si falla
+                              setInteresChanges((c) => {
+                                const { [interes.id]: _, ...rest } = c;
+                                return rest;
+                              });
+                            }
+                          }}
+                          style={{ padding: '4px 8px', fontSize: 13, borderRadius: 4, border: '1px solid var(--line)', marginLeft: 8 }}>
+                          <option value="nuevo">Nuevo</option>
+                          <option value="contactado">Contactado</option>
+                          <option value="visita">Visita</option>
+                          <option value="negociacion">Negociación</option>
+                          <option value="cerrado">Cerrado</option>
+                          <option value="perdido">Perdido</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -207,17 +281,6 @@
             </div>
           </div>
 
-          <div style={{ marginBottom: 20 }}>
-            <span className="t-eyebrow" style={{ display: 'block', marginBottom: 4 }}>Cambiar estado</span>
-            <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: '0 0 10px' }}>{SI[lead.estado] ? SI[lead.estado].desc : ''}</p>
-            <div className="status-select">
-              {STATUS_OPTS.map((s) => (
-                <button key={s} className={`st-opt ${s}${lead.estado === s ? ' active' : ''}`} onClick={() => onStatus(lead.id, s)} title={(SI[s] || {}).desc || s}>
-                  <span className="od" style={{ background: lead.estado === s ? '#fff' : STATUS_COLOR[s] }} />{(SI[s] || {}).label || s}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <span className="t-eyebrow" style={{ display: 'block', marginBottom: 14 }}>Historial de interacciones</span>
           <div className="timeline">

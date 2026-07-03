@@ -94,8 +94,15 @@
 
     const cities = ['todas', ...Array.from(new Set(leads.map((c) => c.ciudad)))];
 
+    // Contar LEADS que tienen intereses en cada estado (no contar intereses)
     const counts = STATUS_FILTERS.reduce((a, f) => {
-      a[f] = f === 'todos' ? leads.length : leads.filter((l) => l.estado === f).length;
+      if (f === 'todos') {
+        // "Todos" = total de leads únicos
+        a[f] = leads.length;
+      } else {
+        // Para cada estado, contar cuántos LEADS tienen al menos un interés en ese estado
+        a[f] = leads.filter(l => (l.intereses || []).some(i => i.estado === f)).length;
+      }
       return a;
     }, {});
 
@@ -104,7 +111,8 @@
       const hit = (c.nombre + c.email + c.ciudad).toLowerCase().includes(q.toLowerCase());
       const inBudget = c.presupuesto <= maxBudget;
       const inCity = city === 'todas' || c.ciudad === city;
-      const inEstado = estado === 'todos' || c.estado === estado;
+      // NUEVA ARQUITECTURA: Filtrar por estado de intereses, no de lead
+      const inEstado = estado === 'todos' || (c.intereses || []).some(i => i.estado === estado);
       // Filtro de origen: si viene de una recomendación con origen='interesado', excluir captaciones
       const origenFilter = extFilter && extFilter.origen ? extFilter.origen : 'todos';
       const inOrigen = origenFilter === 'todos' || c.origen === origenFilter;
@@ -261,7 +269,6 @@
                   <SortHead k="email">Email</SortHead>
                   <th>Teléfono</th>
                   <SortHead k="ciudad">Ciudad</SortHead>
-                  <SortHead k="estado">Estado</SortHead>
                   <SortHead k="interes">Interés</SortHead>
                   <th>Fecha de visita</th>
                 </tr>
@@ -276,7 +283,6 @@
                     <td className="cell-mut">{c.email}</td>
                     <td className="mono">{c.tel}</td>
                     <td>{c.ciudad}</td>
-                    <td><StatusBadge status={c.estado} /></td>
                     <td><QualityLabel lead={c} visits={visits} /></td>
                     <td className="cell-mut">
                       {v
@@ -305,7 +311,6 @@
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="phone" size={15} />{c.tel}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTop: '1px solid var(--line-2)' }}>
-                  <StatusBadge status={c.estado} />
                   <QualityLabel lead={c} visits={visits} />
                   <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.fecha}</span>
                 </div>

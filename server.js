@@ -298,10 +298,10 @@ async function ensureTestData() {
   try {
     const client_id = 'default-client';
 
-    // Verificar si ya existen datos de prueba
+    // Verificar si ya existen datos de prueba (buscar por email que es único)
     const existingCount = await dbGet(
-      'SELECT COUNT(*) as cnt FROM leads WHERE client_id = ? AND nombre IN (?, ?)',
-      [client_id, 'Laura García', 'Juan Pérez']
+      'SELECT COUNT(*) as cnt FROM leads WHERE client_id = ? AND email IN (?, ?)',
+      [client_id, 'laura@ejemplo.com', 'juan@ejemplo.com']
     );
 
     if (existingCount.cnt > 0) {

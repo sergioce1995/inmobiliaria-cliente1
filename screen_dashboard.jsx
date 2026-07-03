@@ -197,12 +197,11 @@
         </div>
 
         {/* Estado de los interesados */}
-        {analytics.funnel && (
+        {analytics.funnel && analytics.funnel.length > 0 && (
           <div className="dash-grid" style={{ gridTemplateColumns: '1fr' }}>
             <div className="panel">
               <div className="panel-head">
                 <h3>📊 Estado de los interesados</h3>
-                <span className="ph-sub">{analytics.funnel.reduce((a, f) => a + (f.value || 0), 0)} interesados en total</span>
               </div>
               <Funnel data={analytics.funnel} />
             </div>

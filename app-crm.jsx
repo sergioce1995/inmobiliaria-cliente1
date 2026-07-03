@@ -318,7 +318,8 @@
       try {
         const res = await fetch('/api/crm/intereses?client_id=default-client');
         const data = await res.json();
-        const intereses = data.intereses || [];
+        // La API devuelve un array directamente o en data.intereses
+        const intereses = Array.isArray(data) ? data : (data.intereses || []);
         window.ZADI_DATA.intereses = intereses;
         console.log('✅ Intereses cargados:', intereses.length);
         return intereses;
@@ -342,6 +343,10 @@
           .map((l) => {
             // Obtener intereses de este lead
             const leadIntereses = intereses.filter(i => i.lead_id === l.id) || [];
+            // Extraer property_ids desde los intereses del lead
+            const propsFromIntereses = [...new Set(leadIntereses.map(i => i.property_id).filter(Boolean))];
+            // Usar propiedades desde intereses si existen, sino fallback a getLeadProperties
+            const propiedades = propsFromIntereses.length > 0 ? propsFromIntereses : getLeadProperties(l);
             return {
               id: l.id,
               nombre: `${l.nombre || ''} ${l.apellidos || ''}`.trim() || 'Sin nombre',
@@ -353,8 +358,8 @@
               status: l.status || 'nuevo',
               origen: l.origin || 'Web',
               propiedad: l.source_property_id || '',
-              propiedades: getLeadProperties(l),
-              interes_propiedades: l.interes_propiedades || '[]',
+              propiedades: propiedades,
+              interes_propiedades: JSON.stringify(propiedades),
               intereses: leadIntereses, // NUEVO: agregar intereses
               presupuesto: 0,
               ciudad: '',
@@ -744,20 +749,17 @@
       // Nuevos interesados en las últimas 24 h
       const last24 = leads.filter((l) => l.created_at && (now - new Date(l.created_at)) < dayMs);
 
-      // Estadísticas de interés por propiedad (interesados / sin contactar / visitas / compatibles)
+      // NUEVA ARQUITECTURA: Estadísticas de interés por propiedad (contar intereses, no leads)
       const propStats = properties.map((p) => {
-        const interesados = leads.filter((l) => {
-          if (l.origen === 'captacion') return false; // Excluir captaciones
-          try {
-            const ips = JSON.parse(l.interes_propiedades || '[]');
-            if (Array.isArray(ips)) return ips.some((ip) => (typeof ip === 'object' ? ip.id : ip) === p.id);
-          } catch {}
-          return false;
+        // Contar intereses para esta propiedad, excluyendo captaciones
+        const interesesProp = allIntereses.filter((i) => {
+          const lead = leads.find((l) => l.id === i.lead_id);
+          return i.property_id === p.id && lead && lead.origen !== 'captacion';
         });
-        const sinContactar = interesados.filter((l) => l.estado === 'nuevo');
+        const sinContactar = interesesProp.filter((i) => i.estado === 'nuevo');
         const vis = progVisits.filter((v) => v.property_id === p.id).length;
         const compat = window.compatibleLeads ? window.compatibleLeads(p, leads, properties) : [];
-        return { p, interesados: interesados.length, sinContactar: sinContactar.length, vis, compat: compat.length };
+        return { p, interesados: interesesProp.length, sinContactar: sinContactar.length, vis, compat: compat.length };
       });
       // Seguimientos de visitas pasadas sin cerrar (más antiguas primero)
       const followUps = leads.map((l) => {
@@ -785,13 +787,15 @@
       // 🔴 Interesados sin contactar (NUEVA ARQUITECTURA: contar por intereses)
       const interesadosSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen !== 'captacion'));
       const captacionesSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen === 'captacion'));
+      const captacionesPendientesNoConvertidas = captPend.length; // Captaciones sin convertir a leads aún
+      const totalCaptaciones = captacionesSinContactar.length + captacionesPendientesNoConvertidas;
       const todosSinContactar = [...interesadosSinContactar, ...captacionesSinContactar];
 
-      if (todosSinContactar.length > 0) {
-        const totalSin = todosSinContactar.length;
+      if (todosSinContactar.length > 0 || captacionesPendientesNoConvertidas > 0) {
+        const totalSin = todosSinContactar.length + captacionesPendientesNoConvertidas;
         recs.push({
           tipo: 'urgente', icon: 'phone', w: 100,  // Prioridad 1
-          accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en propiedad y ${captacionesSinContactar.length} posible${plural(captacionesSinContactar.length)} captacion${captacionesSinContactar.length === 1 ? '' : 'es'}`,
+          accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en comprar o alquilar y ${totalCaptaciones} posible${plural(totalCaptaciones)} captacion${totalCaptaciones === 1 ? '' : 'es'}`,
           motivo: `Todos necesitan contacto inmediato.`,
           cta: 'Ver', action: { screen: 'contactos', estado: 'nuevo' },
         });
@@ -847,7 +851,7 @@
         recs.push({
           tipo: 'importante', icon: 'calendar', w: 90,  // Prioridad 3
           accion: `Programa visitas: ${propsVisitasPendientes.length} propiedad${plural(propsVisitasPendientes.length)} con oportunidades`,
-          motivo: propsVisitasPendientes.slice(0, 3).map((p) => `${p.p.titulo} (${p.interesados})`).join(' • '),
+          motivo: propsVisitasPendientes.slice(0, 3).map((p) => `${p.p.titulo}`).join(' • '),
           cta: 'Ver propiedades', action: { screen: 'propiedades' },
         });
       }
