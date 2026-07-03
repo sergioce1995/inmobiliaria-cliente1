@@ -1,0 +1,4 @@
+Poner en la consola en la carpeta de la inmobiliaria
+npx http-server -p 5173
+
+abrir en navegador http://localhost:5173/ZADI.html

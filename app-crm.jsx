@@ -251,9 +251,11 @@
         if (lead && property_id) {
           // 🔧 Auto-add property to lead's interes_propiedades if not already present
           const currentProps = lead.interes_propiedades ? JSON.parse(lead.interes_propiedades) : [];
+          // Normalizar IDs (algunos pueden ser objetos, otros strings)
           const propIds = currentProps.map(p => typeof p === 'object' ? p.id : p);
           if (!propIds.includes(property_id)) {
-            const updatedProps = [...currentProps, { id: property_id }];
+            // Guardar solo los IDs (no objetos) para evitar "object object" en UI
+            const updatedProps = [...propIds, property_id];
             await fetch(`/api/crm/leads/${lead_id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
@@ -616,6 +618,7 @@
       setScreen(action && action.screen ? action.screen : 'contactos');
     };
     const goTo = (s) => { setExtFilter(null); setScreen(s); };
+    const goToScreen = (s) => { setScreen(s); }; // Navega sin resetear extFilter
 
     // ── Navegación contextualizada para recomendaciones ──
     // Cada recomendación abre exactamente el contexto donde se resuelve el problema
@@ -651,6 +654,20 @@
         openPropertyDetail(action.propertyId, action.activeTab, action.leadIds);
       } else if (type === 'leadsFiltered') {
         openLeadsFiltered(action.estado, action.leadIds);
+      } else if (type === 'propertiesWithIssues') {
+        // Mostrar propiedades con highlight en las que tienen problemas
+        setExtFilter({
+          _highlightPropertyIds: action.propertyIds,
+          _showPropertySelector: true,
+        });
+        goToScreen('propiedades');
+      } else if (type === 'compatibleProperties') {
+        // Mostrar propiedades compatibles para enviar información
+        setExtFilter({
+          _highlightPropertyIds: action.propertyIds,
+          _compatibleMode: true,
+        });
+        goToScreen('propiedades');
       } else if (type === 'calendar') {
         goTo('calendario');
       } else if (type === 'valoraciones') {
@@ -863,7 +880,7 @@
         ]));
         recs.push({
           tipo: 'urgente', icon: 'phone', w: 100,  // Prioridad 1
-          accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en comprar o alquilar y ${totalCaptaciones} posible${plural(totalCaptaciones)} captacion${totalCaptaciones === 1 ? '' : 'es'}`,
+          accion: `Tienes ${totalSin} sin contactar: ${interesadosSinContactar.length} interesado${plural(interesadosSinContactar.length)} en comprar o alquilar y ${totalCaptaciones} posible${plural(totalCaptaciones)} captación${totalCaptaciones === 1 ? '' : 'es'}`,
           motivo: `Todos necesitan contacto inmediato.`,
           cta: 'Ver', action: window.contextNavigation.leadsFiltered('nuevo', leadIdsSinContactar),
         });
@@ -916,14 +933,18 @@
       // 🟢 Propiedades con interesados sin visita programada (general)
       const propsVisitasPendientes = propStats.filter((s) => s.interesados >= 2 && s.vis === 0);
       if (propsVisitasPendientes.length > 0) {
-        // Abrir la primera propiedad con el tab sinContactar active para que vea quién contactar
-        const firstPropWithIssues = propsVisitasPendientes[0];
+        // Pasar todas las propiedades con problemas para que usuario pueda clicar en cada una
+        const propIdsWithIssues = propsVisitasPendientes.map(p => p.p.id);
         recs.push({
           tipo: 'importante', icon: 'calendar', w: 90,  // Prioridad 3
-          accion: `Programa visitas: ${propsVisitasPendientes.length} propiedad${plural(propsVisitasPendientes.length)} con oportunidades`,
+          accion: `Programa visitas: ${propsVisitasPendientes.length} propiedade${plural(propsVisitasPendientes.length)} con oportunidades`,
           motivo: propsVisitasPendientes.slice(0, 3).map((p) => `${p.p.titulo}`).join(' • '),
           cta: 'Ver propiedades',
-          action: firstPropWithIssues ? window.contextNavigation.propertyDetail(firstPropWithIssues.p.id, 'sinContactar') : { screen: 'propiedades' },
+          action: {
+            _contextType: 'propertiesWithIssues',
+            propertyIds: propIdsWithIssues,
+            screen: 'propiedades'
+          },
         });
       }
 
@@ -931,11 +952,17 @@
       const propsConCompat = propStats.filter((s) => s.compat > 2);
       if (propsConCompat.length > 0) {
         const totalCompat = propsConCompat.reduce((s, p) => s + p.compat, 0);
+        const compatPropIds = propsConCompat.map(p => p.p.id);
         recs.push({
           tipo: 'compatibles', icon: 'send', w: 70,  // Prioridad 5
-          accion: `${totalCompat} cliente${plural(totalCompat)} compatibles sin contactar`,
-          motivo: propsConCompat.slice(0, 3).map((p) => `${p.p.titulo} (${p.compat})`).join(' • '),
-          cta: 'Enviar', action: { screen: 'propiedades' },
+          accion: `${totalCompat} cliente${plural(totalCompat)} compatible${plural(totalCompat)} sin contactar`,
+          motivo: propsConCompat.slice(0, 3).map((p) => `${p.p.titulo}`).join(' • '),
+          cta: 'Enviar',
+          action: {
+            _contextType: 'compatibleProperties',
+            propertyIds: compatPropIds,
+            screen: 'propiedades'
+          },
         });
       }
 

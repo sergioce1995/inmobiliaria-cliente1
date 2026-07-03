@@ -676,13 +676,14 @@
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [filterEstado, setFilterEstado] = useState('todos');
 
-    // Aplicar filtro externo si viene - abre una propiedad específica desde contexto
+    // Aplicar filtro externo si viene
     React.useEffect(() => {
-      if (extFilter?._propertyDetailContext && extFilter._selectedProperty) {
+      if (!extFilter) return;
+      if (extFilter._propertyDetailContext && extFilter._selectedProperty) {
         setSelectedProperty(extFilter._selectedProperty);
       }
-      if (extFilter?.estado) setFilterEstado(extFilter.estado);
-    }, [extFilter?._propertyDetailContext, extFilter?._selectedProperty, extFilter?.estado]);
+      if (extFilter.estado) setFilterEstado(extFilter.estado);
+    }, [extFilter]);
 
     const leadsDe = (propId) => leads.filter((l) => {
       let propIds = [];
@@ -721,6 +722,45 @@
             <Button variant="primary" icon="plus" onClick={() => { setEditing(null); setShowForm(true); }}>Añadir propiedad</Button>
           </div>
         </div>
+
+        {/* 🎯 Selector de propiedades destacadas (desde recomendación) */}
+        {extFilter?._highlightPropertyIds && extFilter._highlightPropertyIds.length > 0 && (
+          <div style={{ marginBottom: 20, padding: '12px 16px', background: extFilter._compatibleMode ? '#f3e8ff' : '#fff7ed', border: `1px solid ${extFilter._compatibleMode ? '#d8b4fe' : '#fed7aa'}`, borderRadius: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: extFilter._compatibleMode ? '#7c3aed' : '#b45309' }}>
+              {extFilter._compatibleMode ? '✉️ Propiedades con compatibles (clic para abrir):' : '📌 Propiedades con oportunidades (clic para abrir):'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {extFilter._highlightPropertyIds.map(propId => {
+                const prop = properties.find(p => p.id === propId);
+                const isCompat = extFilter._compatibleMode;
+                const borderColor = isCompat ? '#d8b4fe' : '#f59e0b';
+                const textColor = isCompat ? '#7c3aed' : '#b45309';
+                const hoverBg = isCompat ? '#f3e8ff' : '#fef3c7';
+                return prop ? (
+                  <button
+                    key={prop.id}
+                    onClick={() => setSelectedProperty(prop)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: `1px solid ${borderColor}`,
+                      background: 'white',
+                      color: textColor,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => { e.target.style.background = hoverBg; }}
+                    onMouseLeave={(e) => { e.target.style.background = 'white'; }}
+                  >
+                    {prop.titulo}
+                  </button>
+                ) : null;
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Selector de estado */}
         {properties.length > 0 && (
