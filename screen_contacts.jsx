@@ -303,7 +303,6 @@
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="phone" size={15} />{c.tel}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}><Icon name="location" size={15} />{c.ciudad}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTop: '1px solid var(--line-2)' }}>
                   <StatusBadge status={c.estado} />
@@ -321,7 +320,7 @@
             <div className="drawer">
               <window.LeadDetail lead={open} onStatus={setStatus} onAddNote={addNote} onClose={() => setOpenId(null)}
                 visit={visitForLead(open.id)} onSaveVisit={onSaveVisit} onDeleteVisit={onDeleteVisit}
-                onUpdateLead={onUpdateLead} onDeleteLead={onDeleteLead} />
+                onUpdateLead={onUpdateLead} onDeleteLead={onDeleteLead} properties={properties} />
             </div>
           </div>
         )}

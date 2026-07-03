@@ -20,12 +20,17 @@
     return d.toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
-  function LeadDetail({ lead, onStatus, onAddNote, onClose, visit, onSaveVisit, onDeleteVisit, onUpdateLead, onDeleteLead }) {
+  function LeadDetail({ lead, onStatus, onAddNote, onClose, visit, onSaveVisit, onDeleteVisit, onUpdateLead, onDeleteLead, properties = [] }) {
     const [note, setNote] = useState('');
     const [visitVal, setVisitVal] = useState(toLocalInput(visit && visit.scheduled_for));
     const [editing, setEditing] = useState(false);
     const [confirmDel, setConfirmDel] = useState(false);
-    const [edit, setEdit] = useState({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '' });
+    const propIds = (() => {
+      if (lead.propiedades && Array.isArray(lead.propiedades) && lead.propiedades.length) return lead.propiedades;
+      try { const a = JSON.parse(lead.interes_propiedades || '[]'); if (Array.isArray(a) && a.length) return a; } catch {}
+      return lead.propiedad ? [lead.propiedad] : (lead.source_property_id ? [lead.source_property_id] : []);
+    })();
+    const [edit, setEdit] = useState({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '', propiedades: propIds || [] });
     const [copied, setCopied] = useState(null);
     const copyValue = (type, value) => {
       if (navigator.clipboard) navigator.clipboard.writeText(value);
@@ -33,12 +38,30 @@
       setTimeout(() => setCopied(null), 2000);
     };
     React.useEffect(() => {
-      setEdit({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '' });
+      const propIds = (() => {
+        if (lead.propiedades && Array.isArray(lead.propiedades) && lead.propiedades.length) return lead.propiedades;
+        try { const a = JSON.parse(lead.interes_propiedades || '[]'); if (Array.isArray(a) && a.length) return a; } catch {}
+        return lead.propiedad ? [lead.propiedad] : (lead.source_property_id ? [lead.source_property_id] : []);
+      })();
+      setEdit({ nombre: lead._nombre || lead.nombre || '', apellidos: lead._apellidos || '', email: lead.email || '', telefono: lead.tel || '', propiedades: propIds || [] });
       setEditing(false); setConfirmDel(false);
     }, [lead.id]);
     const setE = (k) => (e) => setEdit((f) => ({ ...f, [k]: e.target.value }));
+    const toggleProp = (propId) => {
+      setEdit((f) => {
+        const current = f.propiedades || [];
+        const idx = current.indexOf(propId);
+        if (idx >= 0) return { ...f, propiedades: current.filter((_, i) => i !== idx) };
+        return { ...f, propiedades: [...current, propId] };
+      });
+    };
     const saveEdit = async () => {
-      if (onUpdateLead) { const ok = await onUpdateLead(lead.id, edit); if (ok) setEditing(false); }
+      if (onUpdateLead) {
+        const toSave = { ...edit };
+        if (edit.propiedades && edit.propiedades.length > 0) toSave.interes_propiedades = JSON.stringify(edit.propiedades);
+        const ok = await onUpdateLead(lead.id, toSave);
+        if (ok) setEditing(false);
+      }
     };
     const doDelete = async () => {
       if (onDeleteLead) { const ok = await onDeleteLead(lead.id); if (ok) { setConfirmDel(false); if (onClose) onClose(); } }
@@ -46,12 +69,12 @@
     const SI = window.ZADI_DATA.statusInfo;
     const ref = window.ZADI_DATA.property_ref || {};
     // Calcular propiedades parseando desde interes_propiedades si es necesario
-    const propIds = (() => {
+    const propIdsDisplay = (() => {
       if (lead.propiedades && Array.isArray(lead.propiedades) && lead.propiedades.length) return lead.propiedades;
       try { const a = JSON.parse(lead.interes_propiedades || '[]'); if (Array.isArray(a) && a.length) return a; } catch {}
       return lead.propiedad ? [lead.propiedad] : (lead.source_property_id ? [lead.source_property_id] : []);
     })();
-    const propNames = propIds.map((id) => ref[id]).filter(Boolean);
+    const propNames = propIdsDisplay.map((id) => ref[id]).filter(Boolean);
     const esPropietario = lead.origen === 'captacion';
     const origenLabel = ({ web_form: 'Web · interés en propiedad', captacion: 'Web · captación', manual: 'Alta manual', saved_search: 'Búsqueda guardada', agente_ia: 'Agente IA' })[lead.origen] || lead.origen || 'Web';
     const tipoLead = esPropietario ? 'Propietario · quiere vender / alquilar' : 'Interesado · busca propiedad';
@@ -107,12 +130,26 @@
           {editing ? (
             <div style={{ marginBottom: 22 }}>
               <span className="t-eyebrow" style={{ display: 'block', marginBottom: 12 }}>Editar datos del interesado</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <Input label="Nombre" value={edit.nombre} onChange={setE('nombre')} />
                 <Input label="Apellidos" value={edit.apellidos} onChange={setE('apellidos')} />
                 <Input label="Email" value={edit.email} onChange={setE('email')} />
                 <Input label="Teléfono" value={edit.telefono} onChange={setE('telefono')} />
               </div>
+              {!esPropietario && properties && properties.length > 0 && (
+                <div style={{ marginBottom: 16, padding: '12px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--line)' }}>
+                  <span className="t-eyebrow" style={{ display: 'block', marginBottom: 10 }}>Propiedades de interés</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {properties.map((prop) => (
+                      <label key={prop.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
+                        <input type="checkbox" checked={(edit.propiedades || []).includes(prop.id)} onChange={() => toggleProp(prop.id)} style={{ cursor: 'pointer' }} />
+                        <span style={{ flex: 1 }}>{prop.titulo}</span>
+                        {prop.ciudad && <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{prop.ciudad}</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
                 <Button variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
                 <Button variant="primary" icon="check" onClick={saveEdit} disabled={!edit.nombre}>Guardar cambios</Button>
