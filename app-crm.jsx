@@ -316,11 +316,12 @@
     // Cargar intereses desde la API
     const loadIntereses = async () => {
       try {
-        const res = await fetch('/api/crm/intereses');
+        const res = await fetch('/api/crm/intereses?client_id=default-client');
         const data = await res.json();
-        window.ZADI_DATA.intereses = data || [];
-        console.log('✅ Intereses cargados:', data.length);
-        return data;
+        const intereses = data.intereses || [];
+        window.ZADI_DATA.intereses = intereses;
+        console.log('✅ Intereses cargados:', intereses.length);
+        return intereses;
       } catch (err) {
         console.error('Error loading intereses:', err);
         return [];
@@ -725,6 +726,9 @@
       const lunes = new Date(now); const dow = (lunes.getDay() + 6) % 7;
       lunes.setDate(lunes.getDate() - dow); lunes.setHours(0, 0, 0, 0);
       const domingo = new Date(lunes); domingo.setDate(domingo.getDate() + 7);
+
+      // NUEVA ARQUITECTURA: acceder a intereses
+      const allIntereses = window.ZADI_DATA.intereses || [];
 
       const nuevos = leads.filter((l) => l.estado === 'nuevo');
       const progVisits = visits.filter((v) => v.status === 'programada');
