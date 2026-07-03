@@ -313,36 +313,58 @@
       return lead.source_property_id ? [lead.source_property_id] : [];
     };
 
+    // Cargar intereses desde la API
+    const loadIntereses = async () => {
+      try {
+        const res = await fetch('/api/crm/intereses');
+        const data = await res.json();
+        window.ZADI_DATA.intereses = data || [];
+        console.log('✅ Intereses cargados:', data.length);
+        return data;
+      } catch (err) {
+        console.error('Error loading intereses:', err);
+        return [];
+      }
+    };
+
     // Cargar leads reales desde la API
     const loadLeads = async () => {
       try {
+        // Cargar intereses primero
+        const intereses = await loadIntereses();
+
         const res = await fetch('/api/crm/leads?client_id=default-client');
         const data = await res.json();
         const validStatuses = ['nuevo', 'contactado', 'visita', 'negociacion', 'cerrado', 'perdido'];
         const list = (data.leads || [])
           .filter((l) => validStatuses.includes(l.status))
-          .map((l) => ({
-          id: l.id,
-          nombre: `${l.nombre || ''} ${l.apellidos || ''}`.trim() || 'Sin nombre',
-          _nombre: l.nombre || '',
-          _apellidos: l.apellidos || '',
-          email: l.email || '',
-          tel: l.telefono || '',
-          estado: l.status || 'nuevo',
-          status: l.status || 'nuevo',
-          origen: l.origin || 'Web',
-          propiedad: l.source_property_id || '',
-          propiedades: getLeadProperties(l),
-          interes_propiedades: l.interes_propiedades || '[]',
-          presupuesto: 0,
-          ciudad: '',
-          created_at: l.created_at || null,
-          updated_at: l.updated_at || l.created_at || null,
-          fecha: 'Reciente',
-          avatar: '#2E75B6',
-          score: 80,
-          interacciones: [],
-        }));
+          .map((l) => {
+            // Obtener intereses de este lead
+            const leadIntereses = intereses.filter(i => i.lead_id === l.id) || [];
+            return {
+              id: l.id,
+              nombre: `${l.nombre || ''} ${l.apellidos || ''}`.trim() || 'Sin nombre',
+              _nombre: l.nombre || '',
+              _apellidos: l.apellidos || '',
+              email: l.email || '',
+              tel: l.telefono || '',
+              estado: l.status || 'nuevo',
+              status: l.status || 'nuevo',
+              origen: l.origin || 'Web',
+              propiedad: l.source_property_id || '',
+              propiedades: getLeadProperties(l),
+              interes_propiedades: l.interes_propiedades || '[]',
+              intereses: leadIntereses, // NUEVO: agregar intereses
+              presupuesto: 0,
+              ciudad: '',
+              created_at: l.created_at || null,
+              updated_at: l.updated_at || l.created_at || null,
+              fecha: 'Reciente',
+              avatar: '#2E75B6',
+              score: 80,
+              interacciones: [],
+            };
+          });
         setLeads(list);
       } catch (err) {
         console.error('Error loading leads:', err);
