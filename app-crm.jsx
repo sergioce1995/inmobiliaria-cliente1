@@ -948,8 +948,8 @@
         });
       }
 
-      // Clientes compatibles (si hay muchos)
-      const propsConCompat = propStats.filter((s) => s.compat > 2);
+      // Clientes compatibles - SIEMPRE mostrar (recomendación más importante)
+      const propsConCompat = propStats.filter((s) => s.compat > 0);
       if (propsConCompat.length > 0) {
         const totalCompat = propsConCompat.reduce((s, p) => s + p.compat, 0);
         const compatPropIds = propsConCompat.map(p => p.p.id);
