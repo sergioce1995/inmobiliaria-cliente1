@@ -1202,6 +1202,24 @@ app.post('/api/crm/leads', async (req, res) => {
         `UPDATE leads SET interes_propiedades = ?, source_property_id = COALESCE(source_property_id, ?), status = ?, telefono = COALESCE(NULLIF(telefono,''), ?), updated_at = ? WHERE id = ?`,
         [JSON.stringify(lista), source_property_id || null, nuevoEstado, telefono || '', now, existing.id]
       );
+
+      // Crear/actualizar registros en la tabla intereses
+      // Primero, obtener los intereses existentes
+      const existingIntereses = await dbAll('SELECT property_id FROM intereses WHERE lead_id = ?', [existing.id]);
+      const existingPropIds = existingIntereses.map(i => i.property_id);
+
+      // Crear intereses para propiedades nuevas
+      for (const propId of lista) {
+        if (!existingPropIds.includes(propId)) {
+          const intresId = `intres_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          await dbRun(
+            `INSERT OR IGNORE INTO intereses (id, client_id, lead_id, property_id, estado, fecha_interes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [intresId, client_id, existing.id, propId, 'nuevo', now, now, now]
+          );
+        }
+      }
+
       const lead = await dbGet('SELECT * FROM leads WHERE id = ?', [existing.id]);
       console.log(`🔁 Lead existente actualizado: ${email} (${lista.length} props de interés)`);
       return res.status(200).json(lead);
@@ -1214,6 +1232,18 @@ app.post('/api/crm/leads', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, client_id, nombre, apellidos, email, telefono, origin, source_property_id, JSON.stringify(lista), 'nuevo', notes || '', now, now]
     );
+
+    // Crear registros en la tabla intereses para cada propiedad
+    if (lista.length > 0) {
+      for (const propId of lista) {
+        const intresId = `intres_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await dbRun(
+          `INSERT OR IGNORE INTO intereses (id, client_id, lead_id, property_id, estado, fecha_interes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [intresId, client_id, id, propId, 'nuevo', now, now, now]
+        );
+      }
+    }
 
     console.log(`✅ Lead created: ${nombre} - ${email}`);
     const lead = await dbGet('SELECT * FROM leads WHERE id = ?', [id]);
@@ -1257,7 +1287,7 @@ app.patch('/api/crm/leads/:id', async (req, res) => {
   try {
     const { client_id } = req.user;
     const { id } = req.params;
-    const { status, assigned_to, notes, nombre, apellidos, email, telefono } = req.body;
+    const { status, assigned_to, notes, nombre, apellidos, email, telefono, interes_propiedades } = req.body;
 
     const updates = [];
     const params = [];
@@ -1278,6 +1308,7 @@ app.patch('/api/crm/leads/:id', async (req, res) => {
     if (apellidos !== undefined) { updates.push('apellidos = ?'); params.push(apellidos); }
     if (email !== undefined) { updates.push('email = ?'); params.push(email); }
     if (telefono !== undefined) { updates.push('telefono = ?'); params.push(telefono); }
+    if (interes_propiedades !== undefined) { updates.push('interes_propiedades = ?'); params.push(interes_propiedades); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -1292,6 +1323,33 @@ app.patch('/api/crm/leads/:id', async (req, res) => {
       `UPDATE leads SET ${updates.join(', ')} WHERE id = ? AND client_id = ?`,
       params
     );
+
+    // Si se proporcionan interes_propiedades, crear los registros en la tabla intereses
+    if (interes_propiedades !== undefined) {
+      try {
+        const propIds = typeof interes_propiedades === 'string' ? JSON.parse(interes_propiedades) : interes_propiedades;
+        if (Array.isArray(propIds) && propIds.length > 0) {
+          // Eliminar intereses antiguos de este lead (EXCEPTO los que ya existen con diferente propiedad)
+          const oldIntereses = await dbAll('SELECT id FROM intereses WHERE lead_id = ?', [id]);
+          for (const oldInteres of oldIntereses) {
+            await dbRun('DELETE FROM intereses WHERE id = ?', [oldInteres.id]);
+          }
+
+          // Crear nuevos intereses para cada propiedad
+          for (const propId of propIds) {
+            const intresId = `intres_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await dbRun(
+              `INSERT OR IGNORE INTO intereses (id, client_id, lead_id, property_id, estado, fecha_interes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [intresId, client_id, id, propId, 'nuevo', new Date().toISOString(), new Date().toISOString(), new Date().toISOString()]
+            );
+          }
+          console.log(`✅ Created ${propIds.length} intereses for lead ${id}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ Error creating intereses for lead ${id}:`, err.message);
+      }
+    }
 
     const lead = await dbGet('SELECT * FROM leads WHERE id = ?', [id]);
     console.log(`✅ Lead updated: ${id}`);
