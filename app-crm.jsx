@@ -614,11 +614,13 @@
     // ── Analítica del Dashboard a partir de datos reales ──
     const dashboardAnalytics = (() => {
       const base = window.ZADI_DATA.analytics;
+      // NUEVA ARQUITECTURA: Contar intereses, no leads
+      const allIntereses = window.ZADI_DATA.intereses || [];
       const total = leads.length;
-      const nuevos = leads.filter((l) => l.estado === 'nuevo').length;
-      const contactados = leads.filter((l) => l.estado === 'contactado').length;
-      const conVisita = leads.filter((l) => l.estado === 'visita').length;
-      const cerrados = leads.filter((l) => l.estado === 'cerrado').length;
+      const nuevos = allIntereses.filter((i) => i.estado === 'nuevo').length;
+      const contactados = allIntereses.filter((i) => i.estado === 'contactado').length;
+      const conVisita = allIntereses.filter((i) => i.estado === 'visita').length;
+      const cerrados = allIntereses.filter((i) => i.estado === 'cerrado').length;
       const visitasProg = visits.filter((v) => v.status === 'programada').length;
       // Visitas programadas dentro de la semana en curso (lunes-domingo)
       const now = new Date();
@@ -655,11 +657,18 @@
       const srcColors = { web_form: '#2E75B6', captacion: '#F5A623', manual: '#7A5AE0', saved_search: '#0ea5a3', agente_ia: '#5cb338' };
       const sources = Object.entries(bySource).map(([k, v]) => ({ label: srcLabels[k] || k, value: total ? Math.round((v / total) * 100) : 0, color: srcColors[k] || '#94a3b8' }));
 
-      const nuevosLeads = leads.filter((l) => l.estado === 'nuevo');
-      const contactadosSinVisita = leads.filter((l) => l.estado === 'contactado' && !visits.some((v) => v.lead_id === l.id && v.status === 'programada'));
+      // NUEVA ARQUITECTURA: Contar por intereses
+      const nuevosIntereses = allIntereses.filter((i) => i.estado === 'nuevo');
+      const contactadosSinVisita = allIntereses.filter((i) => i.estado === 'contactado' && !visits.some((v) => v.interes_id === i.id && v.status === 'programada'));
       const insights = [];
-      if (nuevosLeads.length > 0) insights.push({ tag: 'Sin contactar', txt: `Tienes ${nuevosLeads.length} lead${nuevosLeads.length > 1 ? 's' : ''} nuevo${nuevosLeads.length > 1 ? 's' : ''} sin contactar.`, cta: 'Ver en Base de datos', action: { screen: 'contactos', estado: 'nuevo', leadId: nuevosLeads[0].id } });
-      if (contactadosSinVisita.length > 0) insights.push({ tag: 'Agenda una visita', txt: `${contactadosSinVisita.length} lead${contactadosSinVisita.length > 1 ? 's' : ''} contactado${contactadosSinVisita.length > 1 ? 's' : ''} sin visita: agéndala.`, cta: 'Programar visita', action: { screen: 'contactos', estado: 'contactado', leadId: contactadosSinVisita[0].id } });
+      if (nuevosIntereses.length > 0) {
+        const firstLead = leads.find((l) => l.id === nuevosIntereses[0].lead_id);
+        insights.push({ tag: 'Sin contactar', txt: `Tienes ${nuevosIntereses.length} interés${nuevosIntereses.length > 1 ? 'es' : ''} sin contactar.`, cta: 'Ver en Base de datos', action: { screen: 'contactos', estado: 'nuevo', leadId: firstLead?.id } });
+      }
+      if (contactadosSinVisita.length > 0) {
+        const firstLead = leads.find((l) => l.id === contactadosSinVisita[0].lead_id);
+        insights.push({ tag: 'Agenda una visita', txt: `${contactadosSinVisita.length} interés${contactadosSinVisita.length > 1 ? 'es' : ''} contactado${contactadosSinVisita.length > 1 ? 's' : ''} sin visita: agéndala.`, cta: 'Programar visita', action: { screen: 'contactos', estado: 'contactado', leadId: firstLead?.id } });
+      }
       if (valPending > 0) insights.push({ tag: 'Captación', txt: `${valPending} captación${valPending > 1 ? 'es' : ''} pendiente${valPending > 1 ? 's' : ''} de valorar.`, cta: 'Ver captación', action: { screen: 'valoraciones' } });
       if (visitasProg > 0) insights.push({ tag: 'Agenda', txt: `${visitasProg} visita${visitasProg > 1 ? 's' : ''} programada${visitasProg > 1 ? 's' : ''} en total.`, cta: 'Ver calendario', action: { screen: 'calendario' } });
       if (insights.length === 0) insights.push({ tag: 'Todo al día', txt: 'No tienes tareas pendientes ahora mismo.' });
@@ -769,10 +778,10 @@
       // Sistema inteligente de recomendaciones dinámicas — máx 5
       // Mezcla recomendaciones específicas (una propiedad) con generales (múltiples propiedades)
 
-      // 🔴 Interesados sin contactar (TODOS: interesados + captaciones)
-      const todosSinContactar = leads.filter((l) => l.estado === 'nuevo');
-      const captacionesSinContactar = todosSinContactar.filter((l) => l.origen === 'captacion');
-      const interesadosSinContactar = todosSinContactar.filter((l) => l.origen !== 'captacion');
+      // 🔴 Interesados sin contactar (NUEVA ARQUITECTURA: contar por intereses)
+      const interesadosSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen !== 'captacion'));
+      const captacionesSinContactar = allIntereses.filter((i) => i.estado === 'nuevo' && leads.some((l) => l.id === i.lead_id && l.origen === 'captacion'));
+      const todosSinContactar = [...interesadosSinContactar, ...captacionesSinContactar];
 
       if (todosSinContactar.length > 0) {
         const totalSin = todosSinContactar.length;
@@ -790,7 +799,9 @@
           tipo: 'importante', icon: 'calendar', w: 95,  // Prioridad 2
           accion: `Tienes ${visitasHoy.length} visita${plural(visitasHoy.length)} hoy`,
           motivo: visitasHoy.slice(0, 3).map((v) => {
-            const l = leads.find((x) => x.id === v.lead_id);
+            // NUEVA ARQUITECTURA: buscar por interes_id si existe, si no por lead_id
+            const interes = v.interes_id ? allIntereses.find((x) => x.id === v.interes_id) : null;
+            const l = interes ? leads.find((x) => x.id === interes.lead_id) : leads.find((x) => x.id === v.lead_id);
             const h = new Date(v.scheduled_for).getHours();
             const m = new Date(v.scheduled_for).getMinutes();
             return `${l?.nombre || 'Interesado'} a las ${h}:${m < 10 ? '0' : ''}${m}`;
@@ -799,9 +810,9 @@
         });
       }
 
-      // Recomendaciones inteligentes por estado de lead
-      const enNegociacion = leads.filter((l) => l.estado === 'negociacion');
-      const enVisita = leads.filter((l) => l.estado === 'visita');
+      // Recomendaciones inteligentes por estado de interés (NUEVA ARQUITECTURA)
+      const enNegociacion = allIntereses.filter((i) => i.estado === 'negociacion');
+      const enVisita = allIntereses.filter((i) => i.estado === 'visita');
 
       if (enNegociacion.length > 0) {
         recs.push({
