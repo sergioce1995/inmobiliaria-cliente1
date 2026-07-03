@@ -1280,6 +1280,139 @@ app.get('/api/crm/interactions/:lead_id', async (req, res) => {
   }
 });
 
+// ─ DATABASE: Intereses (Lead-Property relationships) ─
+
+// GET /api/crm/intereses - List all interests
+app.get('/api/crm/intereses', async (req, res) => {
+  try {
+    const { client_id } = req.user;
+    const { lead_id, property_id, estado } = req.query;
+
+    let sql = 'SELECT * FROM intereses WHERE client_id = ?';
+    const params = [client_id];
+
+    if (lead_id) {
+      sql += ' AND lead_id = ?';
+      params.push(lead_id);
+    }
+    if (property_id) {
+      sql += ' AND property_id = ?';
+      params.push(property_id);
+    }
+    if (estado) {
+      sql += ' AND estado = ?';
+      params.push(estado);
+    }
+
+    sql += ' ORDER BY fecha_interes DESC';
+
+    const intereses = await dbAll(sql, params);
+    res.json(intereses);
+  } catch (err) {
+    console.error('❌ Error fetching intereses:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/intereses - Create new interest
+app.post('/api/crm/intereses', async (req, res) => {
+  try {
+    const { client_id } = req.user;
+    const { lead_id, property_id, estado = 'nuevo', notas } = req.body;
+
+    if (!lead_id || !property_id) {
+      return res.status(400).json({ error: 'lead_id y property_id son requeridos' });
+    }
+
+    // Verify lead and property belong to client
+    const lead = await dbGet('SELECT id FROM leads WHERE id = ? AND client_id = ?', [lead_id, client_id]);
+    const prop = await dbGet('SELECT id FROM properties WHERE id = ? AND client_id = ?', [property_id, client_id]);
+
+    if (!lead || !prop) {
+      return res.status(404).json({ error: 'Lead o Propiedad no encontrada' });
+    }
+
+    const id = `interes_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+
+    await dbRun(
+      `INSERT INTO intereses (id, client_id, lead_id, property_id, estado, notas, fecha_interes, ultima_actividad, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, client_id, lead_id, property_id, estado, notas || null, now, now, now, now]
+    );
+
+    res.json({ id, lead_id, property_id, estado, notas, fecha_interes: now, ultima_actividad: now });
+  } catch (err) {
+    console.error('❌ Error creating interes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/intereses/:id - Update interest
+app.patch('/api/crm/intereses/:id', async (req, res) => {
+  try {
+    const { client_id } = req.user;
+    const { id } = req.params;
+    const { estado, notas } = req.body;
+
+    const interes = await dbGet('SELECT * FROM intereses WHERE id = ? AND client_id = ?', [id, client_id]);
+    if (!interes) {
+      return res.status(404).json({ error: 'Interés no encontrado' });
+    }
+
+    const now = new Date().toISOString();
+    const updates = [];
+    const values = [];
+
+    if (estado !== undefined) {
+      updates.push('estado = ?');
+      values.push(estado);
+    }
+    if (notas !== undefined) {
+      updates.push('notas = ?');
+      values.push(notas);
+    }
+
+    updates.push('ultima_actividad = ?');
+    values.push(now);
+    updates.push('updated_at = ?');
+    values.push(now);
+
+    values.push(id);
+    values.push(client_id);
+
+    await dbRun(
+      `UPDATE intereses SET ${updates.join(', ')} WHERE id = ? AND client_id = ?`,
+      values
+    );
+
+    const updated = await dbGet('SELECT * FROM intereses WHERE id = ?', [id]);
+    res.json(updated);
+  } catch (err) {
+    console.error('❌ Error updating interes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/crm/intereses/:id - Delete interest
+app.delete('/api/crm/intereses/:id', async (req, res) => {
+  try {
+    const { client_id } = req.user;
+    const { id } = req.params;
+
+    const interes = await dbGet('SELECT * FROM intereses WHERE id = ? AND client_id = ?', [id, client_id]);
+    if (!interes) {
+      return res.status(404).json({ error: 'Interés no encontrado' });
+    }
+
+    await dbRun('DELETE FROM intereses WHERE id = ?', [id]);
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('❌ Error deleting interes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─ DATABASE: Contacts (Base de Datos) ─
 
 // GET /api/crm/contacts - List all contacts
