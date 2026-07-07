@@ -574,8 +574,15 @@
     // Eliminar (archivar) un lead y sus visitas
     const deleteLead = async (id) => {
       try {
+        // Eliminar visitas asociadas
         const lv = visits.filter((v) => v.lead_id === id);
         for (const v of lv) await fetch(`/api/crm/visits/${v.id}?client_id=default-client`, { method: 'DELETE' });
+
+        // Eliminar intereses asociados (evita registros huérfanos)
+        const li = allIntereses.filter((i) => i.lead_id === id);
+        for (const i of li) await fetch(`/api/crm/intereses/${i.id}?client_id=default-client`, { method: 'DELETE' });
+
+        // Eliminar lead
         const res = await fetch(`/api/crm/leads/${id}?client_id=default-client`, { method: 'DELETE' });
         if (!res.ok) throw new Error('No se pudo eliminar');
         await loadLeads();
@@ -904,8 +911,9 @@
       }
 
       // Recomendaciones inteligentes por estado de interés (NUEVA ARQUITECTURA)
-      const enNegociacion = allIntereses.filter((i) => i.estado === 'negociacion');
-      const enVisita = allIntereses.filter((i) => i.estado === 'visita');
+      // Validar que el lead exista en la BD (evitar intereses huérfanos)
+      const enNegociacion = allIntereses.filter((i) => i.estado === 'negociacion' && leads.some((l) => l.id === i.lead_id));
+      const enVisita = allIntereses.filter((i) => i.estado === 'visita' && leads.some((l) => l.id === i.lead_id));
 
       if (enNegociacion.length > 0) {
         recs.push({
