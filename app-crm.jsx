@@ -705,13 +705,14 @@
     // ── Analítica del Dashboard a partir de datos reales ──
     const dashboardAnalytics = (() => {
       const base = window.ZADI_DATA.analytics;
-      // NUEVA ARQUITECTURA: Contar intereses, no leads
+      // FUENTE DE VERDAD: Contar leads por su status (no intereses por estado)
       const allIntereses = window.ZADI_DATA.intereses || [];
       const total = leads.length;
-      const nuevos = allIntereses.filter((i) => i.estado === 'nuevo').length;
-      const contactados = allIntereses.filter((i) => i.estado === 'contactado').length;
-      const conVisita = allIntereses.filter((i) => i.estado === 'visita').length;
-      const cerrados = allIntereses.filter((i) => i.estado === 'cerrado').length;
+      // Contar leads únicos por status (esto coincide con panel izquierdo y Base de datos)
+      const nuevos = leads.filter((l) => l.status === 'nuevo').length;
+      const contactados = leads.filter((l) => l.status === 'contactado').length;
+      const conVisita = leads.filter((l) => l.status === 'visita').length;
+      const cerrados = leads.filter((l) => l.status === 'cerrado').length;
       const visitasProg = visits.filter((v) => v.status === 'programada').length;
       // Visitas programadas dentro de la semana en curso (lunes-domingo)
       const now = new Date();

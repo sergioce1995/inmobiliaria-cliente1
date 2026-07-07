@@ -101,8 +101,8 @@
         // "Todos" = total de leads únicos
         a[f] = leads.length;
       } else {
-        // Para cada estado, contar cuántos LEADS tienen al menos un interés en ese estado
-        a[f] = leads.filter(l => (l.intereses || []).some(i => i.estado === f)).length;
+        // Para cada estado, contar cuántos LEADS tienen ese status (fuente de verdad)
+        a[f] = leads.filter(l => l.status === f).length;
       }
       return a;
     }, {});
@@ -112,8 +112,8 @@
       const hit = (c.nombre + c.email + c.ciudad).toLowerCase().includes(q.toLowerCase());
       const inBudget = c.presupuesto <= maxBudget;
       const inCity = city === 'todas' || c.ciudad === city;
-      // NUEVA ARQUITECTURA: Filtrar por estado de intereses, no de lead
-      const inEstado = estado === 'todos' || (c.intereses || []).some(i => i.estado === estado);
+      // Filtrar por status del lead (fuente de verdad), no por estado de intereses
+      const inEstado = estado === 'todos' || c.status === estado;
       // Filtro de origen: si viene de una recomendación con origen='interesado', excluir captaciones
       const origenFilter = extFilter && extFilter.origen ? extFilter.origen : 'todos';
       const inOrigen = origenFilter === 'todos' || c.origen === origenFilter;
