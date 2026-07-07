@@ -177,10 +177,9 @@ button { font-family: inherit; }
 }
 .logo-banner-img {
   width: 100%;
-  height: auto;
+  height: 260px;
   display: block;
-  max-height: 200px;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
 }
 .nav {
@@ -210,7 +209,7 @@ button { font-family: inherit; }
     padding: 0.75rem var(--pad-x);
   }
   .logo-banner-img {
-    max-height: 120px;
+    height: 200px;
   }
   .header-inner {
     gap: 0.5rem;
@@ -230,7 +229,7 @@ button { font-family: inherit; }
     padding: 0.5rem var(--pad-x);
   }
   .logo-banner-img {
-    max-height: 90px;
+    height: 150px;
   }
   .header-inner {
     gap: 0.3rem;
