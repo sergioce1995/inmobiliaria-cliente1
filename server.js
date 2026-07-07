@@ -1737,7 +1737,7 @@ app.get('/api/paula/properties', async (req, res) => {
     const showAll = req.query.all === 'true';
     const whereClause = showAll
       ? ''
-      : `WHERE estado IN ('disponible', 'reservado', 'Disponible', 'Reservado')`;
+      : `WHERE estado IN ('disponible', 'reservado', 'alquilado', 'vendido', 'Disponible', 'Reservado', 'Alquilado', 'Vendido')`;
     // Get properties (filtered or all based on query param)
     const properties = await dbAll(
       `SELECT id, client_id, titulo, direccion, tipo, precio_venta, precio_alquiler, habitaciones, banos, metros_cuadrados, unidad_superficie, zona, ciudad, descripcion, caracteristicas, estado, latitud, longitud, created_at, updated_at FROM properties ${whereClause} ORDER BY created_at DESC`,

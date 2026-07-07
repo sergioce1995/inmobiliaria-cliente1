@@ -570,9 +570,13 @@ function PropertyCard({ p, fav, onFav, onOpen }) {
     <article className="card" onClick={onOpen}>
       <div className="card-media">
         <PropertyImage p={p} />
-        <span className={`badge ${p.type === 'alquiler' ? 'alquiler' : ''}`}>
-          {p.type === 'compra' ? 'Compra' : 'Alquiler'}
-        </span>
+        {p.tag && p.tag !== 'disponible' && p.tag !== 'Disponible' ? (
+          <span className={`badge badge-status badge-${p.tag.toLowerCase()}`}>
+            {p.tag.charAt(0).toUpperCase() + p.tag.slice(1)}
+          </span>
+        ) : (
+          <span className="badge badge-disponible">Disponible</span>
+        )}
       </div>
       <div className="card-body">
         <div className="card-row">

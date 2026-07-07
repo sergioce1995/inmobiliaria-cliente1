@@ -66,7 +66,7 @@
           // Guardar cambios de estado de intereses
           for (const [interesId, nuevoEstado] of Object.entries(interesChanges)) {
             try {
-              await fetch(`/api/crm/intereses/${interesId}`, {
+              await fetch(`/api/crm/intereses/${interesId}?client_id=default-client`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ estado: nuevoEstado })
@@ -218,13 +218,22 @@
 
                             // Guardar en la BD
                             try {
-                              const res = await fetch(`/api/crm/intereses/${interes.id}`, {
+                              const res = await fetch(`/api/crm/intereses/${interes.id}?client_id=default-client`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ estado: nuevoEstado })
                               });
                               if (res.ok) {
                                 console.log('✅ Estado de interés actualizado y guardado en BD');
+                                // Refrescar intereses en memoria para que Inicio vea los cambios
+                                try {
+                                  const interesRes = await fetch('/api/crm/intereses?client_id=default-client');
+                                  const interesData = await interesRes.json();
+                                  window.ZADI_DATA.intereses = Array.isArray(interesData) ? interesData : (interesData.intereses || []);
+                                  console.log('✅ Caché de intereses actualizado');
+                                } catch (e) {
+                                  console.error('Error refrescando intereses:', e);
+                                }
                               } else {
                                 console.error('❌ Error al guardar en BD:', res.status);
                                 // Revertir cambio si falla

@@ -189,7 +189,7 @@
     );
   }
 
-  const STATUS_CLASS = { 'Disponible': 'disp', 'Reservado': 'res', 'Vendido': 'vend', 'Alquilado': 'alq' };
+  const STATUS_CLASS = { 'Disponible': 'disp', 'Reservado': 'res', 'Vendido': 'vend', 'Alquilado': 'alq', 'Cerrado': 'cerr' };
 
   // ─── CARD ────────────────────────────────────────────────────────
   function PropCard({ p, onShare, onEdit, onDelete, interesados = 0, onOpenDetail }) {
@@ -532,7 +532,7 @@
                 <div className="pf-field pf-full">
                   <label>Estado</label>
                   <div className="pf-regimen">
-                    {['disponible', 'reservado', 'vendido', 'alquilado'].map((s) => (
+                    {['disponible', 'reservado', 'vendido', 'alquilado', 'cerrado'].map((s) => (
                       <button key={s} type="button" className={`pf-reg ${form.estado === s ? 'on' : ''}`}
                         onClick={() => update('estado', s)} style={{textTransform: 'capitalize'}}>{s}</button>
                     ))}
@@ -796,7 +796,7 @@
         {/* Selector de estado */}
         {properties.length > 0 && (
           <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-            {['todos', 'Disponible', 'Reservado', 'Vendido', 'Alquilado'].map((est) => (
+            {['todos', 'Disponible', 'Reservado', 'Vendido', 'Alquilado', 'Cerrado'].map((est) => (
               <button
                 key={est}
                 onClick={() => setFilterEstado(est)}
