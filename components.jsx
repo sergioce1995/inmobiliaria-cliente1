@@ -125,8 +125,12 @@ const kindIcons = {
 function Header({ favorites, onScrollTo }) {
   return (
     <header className="header">
-      <div className="container header-inner">
-        <a className="logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Paula Gutiérrez</a>
+      <div className="header-banner">
+        <a className="logo logo-banner" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <img src="/images/logo/pg_logo.jpeg" alt="PG - Paula Gutiérrez Asesora Inmobiliaria" className="logo-banner-img" />
+        </a>
+      </div>
+      <div className="header-inner">
         <nav className="nav">
           <a onClick={() => onScrollTo('catalogo')}>Catálogo</a>
           <a onClick={() => onScrollTo('vender')}>Vender</a>
