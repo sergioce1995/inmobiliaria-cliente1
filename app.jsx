@@ -283,9 +283,10 @@ function Footer() {
           <span className="logo" style={{ fontSize: '1.2rem', cursor: 'default' }}>Paula Gutiérrez</span>
           <span>· Inmobiliaria en Tenerife</span>
         </div>
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
           <span>info@pgasesorainmobiliaria.com</span>
-          <span>+34 922 000 000</span>
+          <span>+34 638 56 10 80</span>
+          <span>Calle el chorro, 9 · La Laguna</span>
           <span>Privacidad</span>
           <span>Cookies</span>
         </div>
