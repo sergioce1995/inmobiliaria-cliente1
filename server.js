@@ -1464,23 +1464,25 @@ app.get('/api/crm/intereses', async (req, res) => {
     const { client_id } = req.user;
     const { lead_id, property_id, estado } = req.query;
 
-    let sql = 'SELECT * FROM intereses WHERE client_id = ?';
-    const params = [client_id];
+    let sql = `SELECT i.* FROM intereses i
+               INNER JOIN leads l ON i.lead_id = l.id
+               WHERE i.client_id = ? AND l.client_id = ?`;
+    const params = [client_id, client_id];
 
     if (lead_id) {
-      sql += ' AND lead_id = ?';
+      sql += ' AND i.lead_id = ?';
       params.push(lead_id);
     }
     if (property_id) {
-      sql += ' AND property_id = ?';
+      sql += ' AND i.property_id = ?';
       params.push(property_id);
     }
     if (estado) {
-      sql += ' AND estado = ?';
+      sql += ' AND i.estado = ?';
       params.push(estado);
     }
 
-    sql += ' ORDER BY fecha_interes DESC';
+    sql += ' ORDER BY i.fecha_interes DESC';
 
     const intereses = await dbAll(sql, params);
     res.json(intereses);
