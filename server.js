@@ -2050,7 +2050,11 @@ app.delete('/api/crm/properties/:id', async (req, res) => {
 app.post('/api/crm/properties/:id/images', async (req, res) => {
   try {
     const { id } = req.params;
-    const { filename, base64, orden = 0 } = req.body;
+    const { base64, orden = 0 } = req.body;
+    // Sanea el nombre: sin espacios ni caracteres especiales (rompían el CSS url() en el CRM)
+    const rawName = req.body.filename || 'foto.jpg';
+    const ext = (rawName.match(/\.[^.]+$/) || ['.jpg'])[0];
+    const filename = `${uuidv4()}${ext}`;
 
     const property = await dbGet('SELECT * FROM properties WHERE id = ?', [id]);
     if (!property) {
@@ -2097,6 +2101,25 @@ app.delete('/api/crm/properties/:id/images/:imageId', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('❌ Error deleting image:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/properties/:id/images/:imageId/set-main - Marca una imagen como portada (principal)
+// La "principal" es siempre la de menor `orden`; aquí la bajamos por debajo de todas las demás.
+app.patch('/api/crm/properties/:id/images/:imageId/set-main', async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+    const img = await dbGet('SELECT * FROM property_images WHERE id = ? AND property_id = ?', [imageId, id]);
+    if (!img) return res.status(404).json({ error: 'Imagen no encontrada' });
+
+    const row = await dbGet('SELECT MIN(orden) as minOrden FROM property_images WHERE property_id = ?', [id]);
+    const newOrden = (row && row.minOrden != null ? row.minOrden : 0) - 1;
+    await dbRun('UPDATE property_images SET orden = ? WHERE id = ?', [newOrden, imageId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error setting main image:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -25,3 +25,6 @@ Thumbs.db
 # Se copian al disco persistente solo si está vacío; luego mandan los del disco.
 !seed/pg.db
 
+# Backups de datos reales de producción — nunca subir a GitHub
+backups/
+

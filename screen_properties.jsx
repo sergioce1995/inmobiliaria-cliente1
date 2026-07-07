@@ -196,7 +196,7 @@
     const mainImg = p.imagenes && p.imagenes[0] ? p.imagenes[0].url : null;
     return (
       <div className="prop-card" style={{ cursor: 'pointer' }}>
-        <div className="prop-img" onClick={() => onOpenDetail && onOpenDetail(p)} style={{ background: mainImg ? `url(${mainImg}) center/cover` : `linear-gradient(140deg, ${p.tint}1f, ${p.tint}38)`, cursor: 'pointer' }}>
+        <div className="prop-img" onClick={() => onOpenDetail && onOpenDetail(p)} style={{ background: mainImg ? `url("${encodeURI(mainImg)}") center/cover` : `linear-gradient(140deg, ${p.tint}1f, ${p.tint}38)`, cursor: 'pointer' }}>
           {!mainImg && <image-slot id={p.slot} shape="rect" placeholder={'Sin foto'}></image-slot>}
           <div className="prop-status"><span className={`prop-pill ${STATUS_CLASS[p.estado]}`}>{p.estado}</span></div>
           <div className="prop-price tnum">{fmtEur(p.precio)}</div>
@@ -329,6 +329,9 @@
     }));
     const [existingImages, setExistingImages] = useState(editing?.imagenes || []);
     const [newImages, setNewImages] = useState([]); // {preview, base64, filename}
+    // mainKey identifica la imagen elegida como portada: 'e:<id>' para una existente, 'n:<index>' para una nueva.
+    // null = sin cambios (se mantiene el orden actual, donde la primera ya es la principal).
+    const [mainKey, setMainKey] = useState(null);
     const [sending, setSending] = useState(false);
     const fileRef = useRef(null);
 
@@ -378,7 +381,7 @@
     const removeExisting = async (img) => {
       if (!isEdit) return;
       try {
-        await fetch(`/api/crm/properties/${editing.id}/images/${img.id}`, { method: 'DELETE' });
+        await fetch(`/api/crm/properties/${editing.id}/images/${img.id}?client_id=default-client`, { method: 'DELETE' });
         setExistingImages((p) => p.filter((x) => x.id !== img.id));
       } catch (err) {
         toast('Error eliminando imagen');
@@ -430,10 +433,11 @@
           propertyId = property.id;
         }
 
-        // Subir imágenes nuevas
+        // Subir imágenes nuevas (guardamos el id real que devuelve el servidor para poder marcarla como principal)
+        const uploadedNewImageIds = [];
         for (let i = 0; i < newImages.length; i++) {
           const img = newImages[i];
-          await fetch(`/api/crm/properties/${propertyId}/images`, {
+          const res = await fetch(`/api/crm/properties/${propertyId}/images`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -443,6 +447,18 @@
               client_id: 'default-client',
             }),
           });
+          const saved = res.ok ? await res.json() : null;
+          uploadedNewImageIds.push(saved?.id || null);
+        }
+
+        // Si el usuario eligió una portada distinta de la que ya era principal, la persistimos.
+        if (mainKey) {
+          let mainImageId = null;
+          if (mainKey.startsWith('e:')) mainImageId = mainKey.slice(2);
+          else if (mainKey.startsWith('n:')) mainImageId = uploadedNewImageIds[Number(mainKey.slice(2))];
+          if (mainImageId) {
+            await fetch(`/api/crm/properties/${propertyId}/images/${mainImageId}/set-main?client_id=default-client`, { method: 'PATCH' });
+          }
         }
 
         toast(isEdit ? '✓ Propiedad actualizada' : '✓ Propiedad publicada en la web');
@@ -620,24 +636,39 @@
                   onChange={(e) => onFilesPicked(e.target.files)} />
               </div>
 
-              {(existingImages.length > 0 || newImages.length > 0) && (
+              {(existingImages.length > 0 || newImages.length > 0) && (() => {
+                // Sin selección explícita, la principal es la primera existente (o si no hay, la primera nueva) — igual que hoy en la web.
+                const defaultKey = existingImages.length > 0 ? 'e:' + existingImages[0].id : (newImages.length > 0 ? 'n:0' : null);
+                const activeKey = mainKey || defaultKey;
+                return (
                 <div className="pf-imgs-grid">
-                  {existingImages.map((img, i) => (
-                    <div key={'e'+img.id} className="pf-img-card">
-                      <img src={img.url} alt="" />
-                      {i === 0 && <div className="pf-img-badge">Principal</div>}
+                  {existingImages.map((img, i) => {
+                    const key = 'e:' + img.id;
+                    const isMain = activeKey === key;
+                    return (
+                    <div key={'e'+img.id} className="pf-img-card" style={{ position: 'relative' }}>
+                      <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {isMain && <div className="pf-img-badge">★ Principal</div>}
+                      <button type="button" className="pf-img-main" onClick={() => setMainKey(key)} title="Marcar como principal" style={{ position: 'absolute', top: 4, right: 28, background: isMain ? '#f59e0b' : 'rgba(255,255,255,0.8)', border: 'none', width: 28, height: 28, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>★</button>
                       <button type="button" className="pf-img-rm" onClick={() => removeExisting(img)}>×</button>
                     </div>
-                  ))}
-                  {newImages.map((img, i) => (
-                    <div key={'n'+i} className="pf-img-card">
-                      <img src={img.preview} alt="" />
-                      {existingImages.length === 0 && i === 0 && <div className="pf-img-badge">Principal</div>}
+                    );
+                  })}
+                  {newImages.map((img, i) => {
+                    const key = 'n:' + i;
+                    const isMain = activeKey === key;
+                    return (
+                    <div key={'n'+i} className="pf-img-card" style={{ position: 'relative' }}>
+                      <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {isMain && <div className="pf-img-badge">★ Principal</div>}
+                      <button type="button" className="pf-img-main" onClick={() => setMainKey(key)} title="Marcar como principal" style={{ position: 'absolute', top: 4, right: 28, background: isMain ? '#f59e0b' : 'rgba(255,255,255,0.8)', border: 'none', width: 28, height: 28, borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>★</button>
                       <button type="button" className="pf-img-rm" onClick={() => removeNew(i)}>×</button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
+                );
+              })()}
 
               {existingImages.length === 0 && newImages.length === 0 && (
                 <p className="pf-hint">Puedes publicar sin imágenes, pero las propiedades con fotos reciben hasta 5× más contactos.</p>
