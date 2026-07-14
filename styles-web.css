@@ -1081,8 +1081,8 @@ select.input {
   position: fixed;
   inset: 0;
   background: color-mix(in oklab, var(--bg) 82%, transparent);
-  /* Must beat Leaflet's internal z-indexes: panes 200-700, controls 800. */
-  z-index: 2000;
+  /* Must beat subbar (9999) and Leaflet's internal z-indexes: panes 200-700, controls 800. */
+  z-index: 10000;
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   backdrop-filter: blur(24px) saturate(170%);
   display: flex;
