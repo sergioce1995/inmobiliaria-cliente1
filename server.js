@@ -155,6 +155,7 @@ function initializeCRMTables() {
 
       // Migrar datos después de que todas las migraciones se completen
       migrateInteresesData();
+      migrateVisitsToEvents();
     });
   } catch (err) {
     console.error('❌ Error loading migrations:', err.message);
@@ -203,6 +204,64 @@ async function migrateInteresesData() {
     }
   } catch (err) {
     console.warn(`⚠️ Error during intereses migration: ${err.message}`);
+  }
+}
+
+// ─ Migración de datos: convertir visits a events ─
+async function migrateVisitsToEvents() {
+  try {
+    // Verificar si ya hay datos en la tabla events
+    const count = await dbGet('SELECT COUNT(*) as cnt FROM events');
+    if (count && count.cnt > 0) {
+      console.log('✅ Events table already populated, skipping migration');
+      return;
+    }
+
+    // Obtener todos los visits
+    const visits = await dbAll('SELECT * FROM visits');
+
+    if (!visits || visits.length === 0) {
+      console.log('ℹ️ No visits to migrate');
+      return;
+    }
+
+    let migratedCount = 0;
+    for (const visit of visits) {
+      try {
+        await dbRun(
+          `INSERT OR IGNORE INTO events (
+            id, client_id, type, lead_id, property_id, title, description,
+            scheduled_for, duration_minutes, color, status, notes, created_by, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            visit.id,
+            visit.client_id,
+            'visit', // type
+            visit.lead_id,
+            visit.property_id,
+            visit.title || 'Visita',
+            null, // description
+            visit.scheduled_for,
+            visit.duration_minutes || 30,
+            'blue', // color para visitas
+            visit.status || 'programada',
+            visit.notes,
+            visit.created_by,
+            visit.created_at,
+            visit.updated_at
+          ]
+        );
+        migratedCount++;
+      } catch (e) {
+        console.warn(`⚠️ Error migrating visit ${visit.id}: ${e.message}`);
+      }
+    }
+
+    if (migratedCount > 0) {
+      console.log(`✅ Migrated ${migratedCount} visits to events`);
+    }
+  } catch (err) {
+    console.warn(`⚠️ Error during visits migration: ${err.message}`);
   }
 }
 
@@ -2294,6 +2353,124 @@ app.delete('/api/crm/visits/:id', (req, res) => {
   try {
     const { id } = req.params;
     db.run('UPDATE visits SET status = "cancelada", updated_at = ? WHERE id = ?', [new Date().toISOString(), id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─ EVENTS: Eventos genericos (visitas, reuniones, tareas, personales) ─
+
+// GET /api/crm/events — Listar eventos
+app.get('/api/crm/events', (req, res) => {
+  try {
+    const { client_id, lead_id, type, from, to } = req.query;
+    if (!client_id) return res.status(400).json({ error: 'client_id required' });
+
+    let sql = `SELECT e.*, COALESCE(TRIM(l.nombre || ' ' || COALESCE(l.apellidos,'')), e.title, 'Evento') AS lead_name
+      FROM events e LEFT JOIN leads l ON e.lead_id = l.id
+      WHERE e.client_id = ? AND e.status != 'cancelada'`;
+    const params = [client_id];
+
+    if (lead_id) {
+      sql += ' AND e.lead_id = ?';
+      params.push(lead_id);
+    }
+    if (type) {
+      sql += ' AND e.type = ?';
+      params.push(type);
+    }
+    if (from && to) {
+      sql += ' AND e.scheduled_for BETWEEN ? AND ?';
+      params.push(from, to);
+    }
+    sql += ' ORDER BY e.scheduled_for ASC';
+
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ events: rows || [] });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/events — Crear nuevo evento
+app.post('/api/crm/events', (req, res) => {
+  try {
+    const { client_id, type, lead_id, property_id, title, description, scheduled_for, duration_minutes, notes } = req.body;
+    if (!client_id || !title || !scheduled_for) {
+      return res.status(400).json({ error: 'client_id, title, scheduled_for required' });
+    }
+
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    const colorMap = { 'visit': 'blue', 'meeting': 'orange', 'task': 'green', 'personal': 'gray' };
+    const color = colorMap[type] || 'blue';
+
+    db.run(
+      `INSERT INTO events (id, client_id, type, lead_id, property_id, title, description, scheduled_for, duration_minutes, color, status, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'programada', ?, ?, ?)`,
+      [id, client_id, type || 'visit', lead_id || null, property_id || null, title, description || null, scheduled_for, duration_minutes || 30, color, notes || '', now, now],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.get('SELECT * FROM events WHERE id = ?', [id], (err, event) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.status(201).json(event);
+        });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/events/:id — Actualizar evento
+app.patch('/api/crm/events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { scheduled_for, title, description, type, notes, duration_minutes, status } = req.body;
+
+    const updates = [];
+    const params = [];
+
+    if (scheduled_for) { updates.push('scheduled_for = ?'); params.push(scheduled_for); }
+    if (title !== undefined) { updates.push('title = ?'); params.push(title); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (type) { updates.push('type = ?'); params.push(type); }
+    if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
+    if (duration_minutes !== undefined) { updates.push('duration_minutes = ?'); params.push(duration_minutes); }
+    if (status) { updates.push('status = ?'); params.push(status); }
+
+    if (updates.length === 0) return res.json({ message: 'No updates' });
+
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(id);
+
+    db.run(
+      `UPDATE events SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.get('SELECT * FROM events WHERE id = ?', [id], (err, event) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json(event);
+        });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/crm/events/:id — Eliminar evento
+app.delete('/api/crm/events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.run('UPDATE events SET status = "cancelada", updated_at = ? WHERE id = ?', [new Date().toISOString(), id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true });
     });

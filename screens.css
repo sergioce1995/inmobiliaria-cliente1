@@ -532,6 +532,54 @@ body.anims .login-card { animation: popIn .5s var(--ease); }
   color: var(--ink); background: var(--surface);
   transition: border-color 0.15s;
 }
+.pf-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  padding-right: 40px;
+}
+
+/* Mejorada: Envolvedor de select con icono integrado */
+.select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select-wrapper select {
+  width: 100%;
+  cursor: pointer;
+  padding: 11px 14px;
+  padding-right: 40px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md, 8px);
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: var(--surface);
+  transition: all 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.select-wrapper select:hover {
+  border-color: var(--ink-2);
+  background-color: var(--surface);
+}
+
+.select-wrapper select:focus {
+  outline: none;
+  border-color: var(--blue, #2E75B6);
+  box-shadow: 0 0 0 3px var(--blue-50, #2E75B622);
+}
+
+.select-wrapper select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
 .pf-field input:focus, .pf-field textarea:focus, .pf-field select:focus {
   outline: none; border-color: var(--blue, #2E75B6);
   box-shadow: 0 0 0 3px var(--blue-50, #2E75B622);

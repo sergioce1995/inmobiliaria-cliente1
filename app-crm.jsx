@@ -152,38 +152,48 @@
     const [leads, setLeads] = useState(zadiData.leads || []);
     const [valoraciones, setValoraciones] = useState(zadiData.valoraciones || []);
     const [properties, setProperties] = useState([]);
-    const [visits, setVisits] = useState([]);
+    const [visits, setVisits] = useState([]); // ahora también incluye otros eventos (meetings, tasks, personal)
     const [extFilter, setExtFilter] = useState(null);
     const [pushToast, toastNode] = useToasts();
 
     // ── VISITAS ──────────────────────────────────────────────
     const loadVisits = async () => {
       try {
-        const res = await fetch('/api/crm/visits?client_id=default-client');
+        // Intentar cargar eventos (incluye visitas como type='visit')
+        const res = await fetch('/api/crm/events?client_id=default-client');
         const data = await res.json();
-        setVisits(data.visits || []);
+        setVisits(data.events || []);
       } catch (err) {
-        console.error('Error loading visits:', err);
+        console.error('Error loading events:', err);
+        // Fallback a visits para compatibilidad
+        try {
+          const res = await fetch('/api/crm/visits?client_id=default-client');
+          const data = await res.json();
+          setVisits(data.visits || []);
+        } catch (err2) {
+          console.error('Error loading visits fallback:', err2);
+        }
       }
     };
 
     // Crea o actualiza la visita de un lead. Si ya tiene visita programada, la mueve.
     const saveVisit = async (leadId, scheduledFor, opts = {}) => {
       try {
-        const existing = visits.find((v) => v.lead_id === leadId && v.status === 'programada');
+        const existing = visits.find((v) => v.lead_id === leadId && v.type === 'visit' && v.status === 'programada');
         const lead = leads.find((l) => l.id === leadId);
         if (existing) {
-          await fetch(`/api/crm/visits/${existing.id}`, {
+          await fetch(`/api/crm/events/${existing.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ client_id: 'default-client', scheduled_for: scheduledFor, ...opts }),
           });
         } else {
-          await fetch('/api/crm/visits', {
+          await fetch('/api/crm/events', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               client_id: 'default-client',
+              type: 'visit',
               lead_id: leadId,
               property_id: opts.property_id || null,
               scheduled_for: scheduledFor,
@@ -195,7 +205,7 @@
         }
         await loadVisits();
         // Al programar visita, el lead pasa automáticamente a "Visita" (si estaba nuevo/contactado)
-        if (lead && (lead.estado === 'nuevo' || lead.estado === 'contactado')) {
+        if (lead && (lead.status === 'nuevo' || lead.status === 'contactado')) {
           await fetch(`/api/crm/leads/${leadId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: 'default-client', status: 'visita' }) });
           await loadLeads();
         }
@@ -207,41 +217,43 @@
 
     const deleteVisit = async (visitId) => {
       try {
-        await fetch(`/api/crm/visits/${visitId}?client_id=default-client`, { method: 'DELETE' });
+        await fetch(`/api/crm/events/${visitId}?client_id=default-client`, { method: 'DELETE' });
         await loadVisits();
-        pushToast('Visita eliminada');
+        pushToast('Evento eliminado');
       } catch (err) {
-        console.error('Error deleting visit:', err);
+        console.error('Error deleting event:', err);
       }
     };
 
-    // Mueve una visita (drag&drop o edición) a otra fecha/hora.
+    // Mueve un evento (drag&drop o edición) a otra fecha/hora.
     const moveVisit = async (visitId, scheduledFor) => {
       try {
-        await fetch(`/api/crm/visits/${visitId}`, {
+        await fetch(`/api/crm/events/${visitId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ client_id: 'default-client', scheduled_for: scheduledFor }),
         });
         await loadVisits();
       } catch (err) {
-        console.error('Error moving visit:', err);
+        console.error('Error moving event:', err);
       }
     };
 
-    // Crea una visita nueva directamente desde el calendario (lead + fecha).
-    const createVisit = async ({ lead_id, scheduled_for, property_id, notes, duration_minutes }) => {
+    // Crea un evento nuevo directamente desde el calendario (lead + fecha).
+    const createVisit = async ({ lead_id, scheduled_for, property_id, notes, duration_minutes, type = 'visit', title = 'Evento', description = '' }) => {
       try {
         const lead = leads.find((l) => l.id === lead_id);
-        await fetch('/api/crm/visits', {
+        await fetch('/api/crm/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             client_id: 'default-client',
+            type,
             lead_id,
             property_id: property_id || null,
             scheduled_for,
-            title: lead ? `Visita · ${lead.nombre}` : 'Visita',
+            title: title || (type === 'visit' && lead ? `Visita · ${lead.nombre}` : 'Evento'),
+            description: description || null,
             notes: notes || '',
             duration_minutes: duration_minutes || 30,
           }),

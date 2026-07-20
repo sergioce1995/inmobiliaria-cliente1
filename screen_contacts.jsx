@@ -68,7 +68,7 @@
   }
 
   function ContactsScreen({ leads, setLeads, visits = [], properties = [], extFilter, clearExtFilter, onCreateLead, onUpdateLead, onDeleteLead, onSaveVisit, onDeleteVisit }) {
-    const visitForLead = (id) => visits.find((v) => v.lead_id === id && v.status === 'programada');
+    const visitForLead = (id) => visits.find((v) => v.lead_id === id && v.type === 'visit' && v.status === 'programada');
     const [q, setQ] = useState('');
     const [view, setView] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 860 ? 'grid' : 'table'));
     const [sort, setSort] = useState({ key: 'nombre', dir: 1 });
