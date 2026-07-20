@@ -94,13 +94,11 @@
             </div>
           )}
 
-          {type !== 'personal' && (
-            <div style={{ marginTop: 12 }} className="field">
-              <label>Título {type === 'visit' ? '' : '*'}</label>
-              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder={type === 'visit' ? 'Auto-rellenar con nombre' : 'Título del evento'} />
-            </div>
-          )}
+          <div style={{ marginTop: 12 }} className="field">
+            <label>Título {type === 'visit' ? '' : '*'}</label>
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
+              placeholder={type === 'visit' ? 'Auto-rellenar con nombre' : 'Título del evento'} />
+          </div>
 
           {type !== 'visit' && (
             <div style={{ marginTop: 12 }}>
