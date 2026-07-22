@@ -1,0 +1,2 @@
+-- Migración 005: Historial de operaciones (vacía por ahora)
+-- Las operaciones históricas se pueden registrar manualmente por el usuario

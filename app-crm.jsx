@@ -153,6 +153,7 @@
     const [valoraciones, setValoraciones] = useState(zadiData.valoraciones || []);
     const [properties, setProperties] = useState([]);
     const [visits, setVisits] = useState([]); // ahora también incluye otros eventos (meetings, tasks, personal)
+    const [operations, setOperations] = useState([]); // operaciones (ventas y alquileres) para Análisis
     const [extFilter, setExtFilter] = useState(null);
     const [pushToast, toastNode] = useToasts();
 
@@ -173,6 +174,57 @@
         } catch (err2) {
           console.error('Error loading visits fallback:', err2);
         }
+      }
+    };
+
+    // ── OPERACIONES (Ventas y Alquileres) ──────────────────────────────────────
+    const loadOperations = async () => {
+      try {
+        const res = await fetch('/api/crm/operations?client_id=default-client');
+        const data = await res.json();
+        setOperations(data || []);
+      } catch (err) {
+        console.error('Error loading operations:', err);
+        setOperations([]);
+      }
+    };
+
+    const createHistoricalOperations = async (props) => {
+      try {
+        // Cargar operaciones existentes de la BD para verificar duplicados
+        const opsRes = await fetch('/api/crm/operations?client_id=default-client');
+        const existingOps = await opsRes.json();
+
+        const today = new Date().toISOString().split('T')[0];
+        for (const p of props) {
+          const estado = p.estado_raw?.toLowerCase();
+          if ((estado === 'vendido' || estado === 'alquilado') && p.precio && p.comision !== undefined) {
+            const opType = estado === 'vendido' ? 'sale' : 'rental';
+            // Verificar si ya existe una operación para esta propiedad y tipo
+            const exists = existingOps.some(op => op.property_id === p.id && op.operation_type === opType);
+            if (!exists) {
+              const commission = p.precio * (p.comision / 100);
+              await fetch('/api/crm/operations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  client_id: 'default-client',
+                  property_id: p.id,
+                  operation_type: opType,
+                  operation_date: today,
+                  operation_price: p.precio,
+                  commission_type: 'percentage',
+                  commission_percentage: p.comision,
+                  commission_amount: commission,
+                  income_frequency: opType === 'sale' ? 'once' : 'monthly',
+                  status: opType === 'sale' ? 'closed' : 'active',
+                }),
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error creating historical operations:', err);
       }
     };
 
@@ -329,6 +381,8 @@
         const ref = {};
         list.forEach((p) => { ref[p.id] = p.titulo; });
         window.ZADI_DATA.property_ref = ref;
+        // Auto-crear operaciones históricas para propiedades ya vendidas/alquiladas
+        await createHistoricalOperations(list);
       } catch (err) {
         console.error('Error loading properties:', err);
       }
@@ -624,10 +678,14 @@
 
     useEffect(() => {
       if (logged) {
-        loadProperties();
-        loadLeads();
-        loadVisits();
-        loadCaptaciones();
+        const init = async () => {
+          await loadOperations();
+          await loadProperties();
+          await loadLeads();
+          await loadVisits();
+          await loadCaptaciones();
+        };
+        init();
       }
     }, [logged]);
 
@@ -1061,7 +1119,7 @@
             {screen === 'propiedades' && <PropertiesScreen properties={properties} leads={leads} visits={visits} toast={pushToast} onRefresh={loadProperties} onOpenLead={(leadId) => goWithFilter({ screen: 'contactos', leadId })} extFilter={extFilter} />}
             {screen === 'calendario' && <CalendarScreen visits={visits} leads={leads} properties={properties} onCreateVisit={createVisit} onMoveVisit={moveVisit} onDeleteVisit={deleteVisit} onSaveVisit={saveVisit} toast={pushToast} />}
             {screen === 'valoraciones' && <ValoracionesScreen valoraciones={valoraciones} setValoraciones={setValoraciones} toast={pushToast} onCreate={createCaptacion} onUpdate={updateCaptacion} onDelete={deleteCaptacion} onConvert={convertCaptacion} extFilter={extFilter} />}
-            {screen === 'dashboard' && <DashboardScreen analytics={dashboardAnalytics} properties={properties} onAction={goWithFilter} />}
+            {screen === 'dashboard' && <DashboardScreen analytics={dashboardAnalytics} properties={properties} operations={operations} onAction={goWithFilter} />}
             {screen === 'notificaciones' && <NotificationsScreen notifications={notifications} toast={pushToast} />}
             {screen === 'uikit' && <UIKitScreen />}
           </div>

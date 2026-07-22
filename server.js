@@ -2028,6 +2028,82 @@ app.get('/api/crm/properties/:id', async (req, res) => {
   }
 });
 
+// ── OPERATIONS ─────────────────────────────────────────────────────────────
+
+// GET /api/crm/operations - List operations for a client
+app.get('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client' } = req.query;
+    const operations = await dbAll(
+      `SELECT * FROM property_operations WHERE client_id = ? ORDER BY operation_date DESC`,
+      [client_id]
+    );
+    res.json(operations || []);
+  } catch (err) {
+    console.error('Error loading operations:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/operations - Create a new operation
+app.post('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client', property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes } = req.body;
+
+    const id = uuidv4();
+    await dbRun(
+      `INSERT INTO property_operations (id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes]
+    );
+
+    res.json({ id });
+  } catch (err) {
+    console.error('Error creating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/operations/:id - Update an operation
+app.patch('/api/crm/operations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { commission_percentage, commission_amount } = req.body;
+
+    const updates = [];
+    const params = [];
+
+    if (commission_percentage !== undefined) {
+      updates.push('commission_percentage = ?');
+      params.push(commission_percentage);
+    }
+    if (commission_amount !== undefined) {
+      updates.push('commission_amount = ?');
+      params.push(commission_amount);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    await dbRun(
+      `UPDATE property_operations SET ${updates.join(', ')} WHERE id = ?`,
+      params
+    );
+
+    console.log(`✅ Operación actualizada: ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error updating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // PATCH /api/crm/properties/:id - Update property
 app.patch('/api/crm/properties/:id', async (req, res) => {
   try {
@@ -2621,6 +2697,306 @@ app.post('/api/crm/captaciones/:id/convertir', async (req, res) => {
     res.status(201).json({ property, removedCaptacionId: id });
   } catch (err) {
     console.error('❌ Error converting captación:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// ─ PROPERTY OPERATIONS: Historial de ventas y alquileres ─────
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/crm/operations — Listar operaciones (con filtro opcional por mes/año)
+app.get('/api/crm/operations', (req, res) => {
+  try {
+    const client_id = req.user?.client_id || req.query.client_id || 'default-client';
+    const { property_id, operation_type, year, month } = req.query;
+
+    let sql = 'SELECT * FROM property_operations WHERE client_id = ?';
+    const params = [client_id];
+
+    if (property_id) {
+      sql += ' AND property_id = ?';
+      params.push(property_id);
+    }
+
+    if (operation_type) {
+      sql += ' AND operation_type = ?';
+      params.push(operation_type);
+    }
+
+    // Filtro por año/mes si se proporciona
+    if (year && month) {
+      // Buscar operaciones que ocurrieron en ese mes (operación activa durante ese mes)
+      const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+      const nextMonth = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      sql += ` AND operation_date < ? AND (end_date IS NULL OR end_date >= ?)`;
+      params.push(nextMonth, monthStart);
+    } else if (year) {
+      sql += ` AND strftime('%Y', operation_date) = ?`;
+      params.push(String(year));
+    }
+
+    sql += ' ORDER BY operation_date DESC';
+
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows || []);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/operations — Crear nueva operación (venta o alquiler)
+app.post('/api/crm/operations', (req, res) => {
+  try {
+    const client_id = req.user?.client_id || req.body.client_id || 'default-client';
+    const {
+      property_id,
+      operation_type, // 'sale' o 'rental'
+      operation_date,
+      end_date,
+      operation_price,
+      commission_type, // 'percentage' o 'fixed'
+      commission_percentage,
+      commission_fixed_amount,
+      income_frequency, // 'once' o 'monthly'
+      notes,
+    } = req.body;
+
+    if (!property_id || !operation_type || !operation_date || !operation_price || !commission_type) {
+      return res.status(400).json({ error: 'Campos requeridos: property_id, operation_type, operation_date, operation_price, commission_type' });
+    }
+
+    const id = uuidv4();
+    const now = new Date().toISOString();
+
+    // Calcular comisión
+    let commission_amount = 0;
+    if (commission_type === 'percentage' && commission_percentage) {
+      commission_amount = Math.round((operation_price * commission_percentage) / 100);
+    } else if (commission_type === 'fixed' && commission_fixed_amount) {
+      commission_amount = commission_fixed_amount;
+    }
+
+    db.run(
+      `INSERT INTO property_operations (
+        id, client_id, property_id, operation_type, operation_date, end_date,
+        operation_price, commission_type, commission_percentage, commission_fixed_amount, commission_amount,
+        income_frequency, status, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+      [
+        id, client_id, property_id, operation_type, operation_date, end_date || null,
+        operation_price, commission_type, commission_percentage || null, commission_fixed_amount || null,
+        commission_amount, income_frequency || 'once', notes || '', now, now,
+      ],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.get('SELECT * FROM property_operations WHERE id = ?', [id], (err, operation) => {
+          if (err) return res.status(500).json({ error: err.message });
+          console.log(`✅ Operación creada: ${operation_type} en ${property_id}`);
+          res.status(201).json(operation);
+        });
+      }
+    );
+  } catch (err) {
+    console.error('❌ Error creating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/operations/:id — Editar operación (cerrar alquiler, etc.)
+app.patch('/api/crm/operations/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { end_date, status, notes } = req.body;
+    const now = new Date().toISOString();
+
+    const updates = [];
+    const params = [];
+
+    if (end_date !== undefined) {
+      updates.push('end_date = ?');
+      params.push(end_date);
+    }
+
+    if (status !== undefined) {
+      updates.push('status = ?');
+      params.push(status);
+    }
+
+    if (notes !== undefined) {
+      updates.push('notes = ?');
+      params.push(notes);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(now);
+    params.push(id);
+
+    if (updates.length === 1) return res.status(400).json({ error: 'No fields to update' });
+
+    db.run(
+      `UPDATE property_operations SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.get('SELECT * FROM property_operations WHERE id = ?', [id], (err, operation) => {
+          if (err) return res.status(500).json({ error: err.message });
+          console.log(`✅ Operación actualizada: ${id}`);
+          res.json(operation);
+        });
+      }
+    );
+  } catch (err) {
+    console.error('❌ Error updating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── OPERACIONES (Ventas y Alquileres) ────────────────────────
+
+// GET /api/crm/operations - List operations for a client
+app.get('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client' } = req.query;
+    const operations = await dbAll(
+      `SELECT * FROM property_operations WHERE client_id = ? ORDER BY operation_date DESC`,
+      [client_id]
+    );
+    res.json(operations || []);
+  } catch (err) {
+    console.error('Error loading operations:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/operations - Create a new operation
+app.post('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client', property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes } = req.body;
+
+    const id = uuidv4();
+    await dbRun(
+      `INSERT INTO property_operations (id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes]
+    );
+
+    res.json({ id });
+  } catch (err) {
+    console.error('Error creating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/operations/:id - Update an operation
+app.patch('/api/crm/operations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { commission_percentage, commission_amount } = req.body;
+
+    const updates = [];
+    const params = [];
+
+    if (commission_percentage !== undefined) {
+      updates.push('commission_percentage = ?');
+      params.push(commission_percentage);
+    }
+    if (commission_amount !== undefined) {
+      updates.push('commission_amount = ?');
+      params.push(commission_amount);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    await dbRun(
+      `UPDATE property_operations SET ${updates.join(', ')} WHERE id = ?`,
+      params
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── OPERACIONES (Ventas y Alquileres) ────────────────────────
+
+// GET /api/crm/operations - List operations for a client
+app.get('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client' } = req.query;
+    const operations = await dbAll(
+      `SELECT * FROM property_operations WHERE client_id = ? ORDER BY operation_date DESC`,
+      [client_id]
+    );
+    res.json(operations || []);
+  } catch (err) {
+    console.error('Error loading operations:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/crm/operations - Create a new operation
+app.post('/api/crm/operations', async (req, res) => {
+  try {
+    const { client_id = 'default-client', property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes } = req.body;
+
+    const id = uuidv4();
+    await dbRun(
+      `INSERT INTO property_operations (id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, client_id, property_id, operation_type, operation_date, operation_price, commission_type, commission_percentage, commission_amount, income_frequency, status, notes]
+    );
+
+    res.json({ id });
+  } catch (err) {
+    console.error('Error creating operation:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/crm/operations/:id - Update an operation
+app.patch('/api/crm/operations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { commission_percentage, commission_amount } = req.body;
+
+    const updates = [];
+    const params = [];
+
+    if (commission_percentage !== undefined) {
+      updates.push('commission_percentage = ?');
+      params.push(commission_percentage);
+    }
+    if (commission_amount !== undefined) {
+      updates.push('commission_amount = ?');
+      params.push(commission_amount);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    await dbRun(
+      `UPDATE property_operations SET ${updates.join(', ')} WHERE id = ?`,
+      params
+    );
+
+    console.log(`✅ Operación actualizada: ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error updating operation:', err);
     res.status(500).json({ error: err.message });
   }
 });
