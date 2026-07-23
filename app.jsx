@@ -111,8 +111,8 @@ function App() {
         window.location.hash = String(idx);
       }
     } else {
-      // Clear hash when closing
-      window.location.hash = '';
+      // Clear hash when closing - use replaceState to remove # completely
+      window.history.replaceState(null, '', window.location.pathname);
     }
   }, [data]);
   const [favorites, setFavorites] = React.useState(() => new Set());
