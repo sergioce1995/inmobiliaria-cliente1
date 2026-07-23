@@ -64,6 +64,15 @@ function App() {
           images: p.images || p.photos || [],
         }));
         setData(adapted);
+
+        // Auto-open property from URL hash if present (numeric index)
+        const hash = window.location.hash.slice(1); // Remove #
+        if (hash && !isNaN(hash)) {
+          const idx = parseInt(hash, 10);
+          if (idx >= 0 && idx < adapted.length) {
+            setOpenPropertyRaw(adapted[idx]);
+          }
+        }
       } catch (err) {
         console.error('Error cargando propiedades:', err);
         setData([]);
@@ -94,8 +103,18 @@ function App() {
   // marker card so the two surfaces never overlap.
   const setOpenProperty = React.useCallback((p) => {
     setOpenPropertyRaw(p);
-    if (p) setActive(null);
-  }, []);
+    if (p && data.length > 0) {
+      setActive(null);
+      // Update URL hash with numeric index (shorter URL)
+      const idx = data.findIndex(prop => prop.id === p.id);
+      if (idx >= 0) {
+        window.location.hash = String(idx);
+      }
+    } else {
+      // Clear hash when closing
+      window.location.hash = '';
+    }
+  }, [data]);
   const [favorites, setFavorites] = React.useState(() => new Set());
   const [toast, setToast] = React.useState('');
 
