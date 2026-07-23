@@ -1841,7 +1841,7 @@ app.get('/api/paula/properties', async (req, res) => {
       try { caracteristicas = JSON.parse(prop.caracteristicas || '[]'); } catch {}
 
       const type = prop.precio_alquiler && !prop.precio_venta ? 'alquiler' : 'compra';
-      const kindMap = { piso: 'Piso', casa: 'Casa', villa: 'Villa', atico: 'Ático', chalet: 'Chalet', duplex: 'Dúplex', local: 'Local', terreno: 'Terreno' };
+      const kindMap = { piso: 'Piso', casa: 'Casa', villa: 'Villa', atico: 'Ático', chalet: 'Chalet', duplex: 'Dúplex', local: 'Local', terreno: 'Terreno', garaje: 'Garaje', habitacion: 'Habitación' };
       const kind = kindMap[prop.tipo] || (prop.tipo ? (prop.tipo.charAt(0).toUpperCase() + prop.tipo.slice(1)) : 'Piso');
 
       return {

@@ -119,6 +119,7 @@ const kindIcons = {
   'Apartamento': Icon.Building,
   'Casa rural': Icon.Rural,
   'Casa': Icon.House,
+  'Habitación': Icon.Studio,
 };
 
 // ── Header ─────────────────────────────────────────────────────
@@ -423,7 +424,7 @@ function FilterBar({ filters, setFilters, view, setView, count }) {
           hasValue={!!filters.kind}
         >
           {(close) => {
-            const types = ['Piso', 'Ático', 'Villa', 'Chalet', 'Dúplex', 'Estudio', 'Loft', 'Casa rural', 'Apartamento'];
+            const types = ['Piso', 'Ático', 'Villa', 'Chalet', 'Dúplex', 'Estudio', 'Loft', 'Casa rural', 'Apartamento', 'Habitación'];
             return (
               <>
                 <div>

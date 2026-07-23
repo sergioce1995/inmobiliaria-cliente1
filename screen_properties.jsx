@@ -305,7 +305,7 @@
   const TIPOS = [
     { v: 'piso', l: 'Piso' }, { v: 'casa', l: 'Casa' }, { v: 'villa', l: 'Villa' },
     { v: 'atico', l: 'Ático' }, { v: 'chalet', l: 'Chalet' }, { v: 'duplex', l: 'Dúplex' },
-    { v: 'local', l: 'Local' }, { v: 'terreno', l: 'Terreno' }, { v: 'garaje', l: 'Garaje' },
+    { v: 'local', l: 'Local' }, { v: 'terreno', l: 'Terreno' }, { v: 'garaje', l: 'Garaje' }, { v: 'habitacion', l: 'Habitación' },
   ];
 
   function PropertyFormModal({ editing, onClose, onSuccess, toast }) {
